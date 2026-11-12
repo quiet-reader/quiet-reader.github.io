@@ -132,8 +132,10 @@ export function LibraryScreen() {
       const first = files[0] as File & { webkitRelativePath?: string };
       const relative = first.webkitRelativePath || "";
       const folder = relative.includes("/") ? relative.split("/")[0] : "";
-      const fallbackTitle = chapters[0].title?.replace(/\s*[-_]?(chapter|ch|part)\s*\d+.*$/i, "").trim();
-      const title = folder || fallbackTitle || chapters[0].title || "Imported novel";
+      const firstChapter = chapters[0];
+      if (!firstChapter) throw new Error("No readable TXT chapters were found.");
+      const fallbackTitle = firstChapter.title?.replace(/\s*[-_]?(chapter|ch|part)\s*\d+.*$/i, "").trim();
+      const title = folder || fallbackTitle || firstChapter.title || "Imported novel";
       const book = { ...freshBook("manual", title), chapters, updated: Date.now() };
       await putLegacyRecord(book as unknown as LegacyLibraryRecord);
       await refresh();
@@ -170,7 +172,11 @@ export function LibraryScreen() {
     const target = index + delta;
     const next = [...(activeBook.chapters ?? [])];
     if (target < 0 || target >= next.length) return;
-    [next[index], next[target]] = [next[target], next[index]];
+    const currentChapter = next[index];
+    const targetChapter = next[target];
+    if (!currentChapter || !targetChapter) return;
+    next[index] = targetChapter;
+    next[target] = currentChapter;
     try { await persistBook({ ...activeBook, chapters: next, updated: Date.now() }); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not reorder chapters."); }
   }
