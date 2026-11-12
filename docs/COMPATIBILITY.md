@@ -24,6 +24,6 @@ Existing records include novels, EPUB/PDF items, galleries, saved pasted chapter
 
 The source supports a ZIP archive with `manifest.json`, `library.json`, individual book/paste JSON records, binary assets and SHA-256 checksums. Restore validates integrity before writing records and performs book/paste writes in one IndexedDB transaction. Restore is additive/upserting by record ID and retains unrelated local records.
 
-Legacy `QuietBookBackup` JSON versions 2 and 3 remain importable.
+Legacy `QuietBookBackup` JSON versions 2 and 3 remain importable. V3 ZIP archives may additionally contain optional `fingerprint`, `origin`, `backupHistory`, and `collections` metadata. Older ZIP archives without these fields remain supported. Virtual collections are stored separately in localStorage under `qrCollections`; their references use stable book/chapter/image IDs.
 
 Tests must cover valid and corrupt checksums, missing files/assets, duplicate IDs, existing IDs, unrelated records, partial archives, transaction failures and round-trip fidelity. Do not expose an import UI until these checks pass.
