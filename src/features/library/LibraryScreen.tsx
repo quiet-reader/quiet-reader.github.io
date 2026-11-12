@@ -109,7 +109,7 @@ export function LibraryScreen() {
   }
 
   async function importTxtFiles(fileList: FileList | File[]) {
-    const files = Array.from(fileList).filter((file) => /\\.txt$/i.test(file.name));
+    const files = Array.from(fileList).filter((file) => /\.txt$/i.test(file.name));
     if (!files.length) { setError("No .txt files were selected."); return; }
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
     files.sort((a, b) => collator.compare(
@@ -120,11 +120,11 @@ export function LibraryScreen() {
     try {
       const chapters: ChapterRecord[] = [];
       for (const file of files) {
-        const text = (await file.text()).replace(/^\\uFEFF/, "").replace(/\\r\\n?/g, "\\n").trim();
+        const text = (await file.text()).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").trim();
         if (!text) continue;
         chapters.push({
           id: makeId("chapter"),
-          title: file.name.replace(/\\.txt$/i, "") || "Untitled chapter",
+          title: file.name.replace(/\.txt$/i, "") || "Untitled chapter",
           text, images: [], createdAt: Date.now(), updatedAt: Date.now(), history: [],
         });
       }
@@ -132,7 +132,7 @@ export function LibraryScreen() {
       const first = files[0] as File & { webkitRelativePath?: string };
       const relative = first.webkitRelativePath || "";
       const folder = relative.includes("/") ? relative.split("/")[0] : "";
-      const fallbackTitle = chapters[0].title?.replace(/\\s*[-_]?(chapter|ch|part)\\s*\\d+.*$/i, "").trim();
+      const fallbackTitle = chapters[0].title?.replace(/\s*[-_]?(chapter|ch|part)\s*\d+.*$/i, "").trim();
       const title = folder || fallbackTitle || chapters[0].title || "Imported novel";
       const book = { ...freshBook("manual", title), chapters, updated: Date.now() };
       await putLegacyRecord(book as unknown as LegacyLibraryRecord);
@@ -146,16 +146,16 @@ export function LibraryScreen() {
   async function importTxtChapters(fileList: FileList | null) {
     if (!activeBook || !fileList?.length) return;
     if (!canBook(activeBook, "chapter.create")) { setError("Unlock this book before importing chapters."); return; }
-    const files = Array.from(fileList).filter((file) => /\\.txt$/i.test(file.name))
+    const files = Array.from(fileList).filter((file) => /\.txt$/i.test(file.name))
       .sort((a, b) => new Intl.Collator(undefined, { numeric: true, sensitivity: "base" }).compare(a.name, b.name));
     if (!files.length) { setError("No .txt files were selected."); return; }
     setSaving(true); setError(null);
     try {
       const imported: ChapterRecord[] = [];
       for (const file of files) {
-        const text = (await file.text()).replace(/^\\uFEFF/, "").replace(/\\r\\n?/g, "\\n").trim();
+        const text = (await file.text()).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").trim();
         if (!text) continue;
-        imported.push({ id: makeId("chapter"), title: file.name.replace(/\\.txt$/i, ""),
+        imported.push({ id: makeId("chapter"), title: file.name.replace(/\.txt$/i, ""),
           text, images: [], createdAt: Date.now(), updatedAt: Date.now(), history: [] });
       }
       if (!imported.length) throw new Error("The selected TXT files are empty.");
