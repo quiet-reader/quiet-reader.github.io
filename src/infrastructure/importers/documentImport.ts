@@ -70,7 +70,7 @@ export async function importEpub(file: File): Promise<ImportedBook> {
     const itemId = item.getAttribute("id");
     if (itemId) manifest.set(itemId, item);
   }
-  const book = freshBook("epub", title) as ImportedBook;
+  const book = freshBook("epub", title) as unknown as ImportedBook;
   book.author = author;
   const coverItem = Array.from(manifest.values()).find((item) => item.getAttribute("properties")?.split(/\s+/).includes("cover-image"));
   if (coverItem) {
@@ -128,7 +128,7 @@ export async function importPdf(file: File): Promise<ImportedBook> {
   }
   const extracted = pages.filter(Boolean).join("\n\n");
   if (!extracted) throw new Error("No selectable text was found. This PDF may be scanned or image-only.");
-  const book = freshBook("pdf", file.name.replace(/\.pdf$/i, "") || "Imported PDF") as ImportedBook;
+  const book = freshBook("pdf", file.name.replace(/\.pdf$/i, "") || "Imported PDF") as unknown as ImportedBook;
   const now = Date.now();
   book.chapters = [{ id: id(), title: "Document", text: extracted, images: [], createdAt: now, updatedAt: now, history: [] }];
   return book;
