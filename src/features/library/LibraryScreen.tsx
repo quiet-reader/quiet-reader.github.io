@@ -80,7 +80,7 @@ export function LibraryScreen() {
   const [draftText, setDraftText] = useState("");
   const [draftImages, setDraftImages] = useState<ChapterImage[]>([]);
   const [readerIndex, setReaderIndex] = useState<number | null>(null);
-  const [fontScale, setFontScale] = useState(1);
+  const [fontScale, setFontScale] = useState(1);\n  const [readerSearch, setReaderSearch] = useState("");\n  const [readerFormat, setReaderFormat] = useState<"normal" | "sections">("normal");
   const [importing, setImporting] = useState(false);
   const [backupBusy, setBackupBusy] = useState(false);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -121,6 +121,15 @@ export function LibraryScreen() {
   }, [query, records, category, sortMode, tagFilter, showFavorites]);
 
   const activeBook = records.find((book) => book.id === activeBookId) ?? null;
+  const readerSearchMatches = useMemo(() => {
+    const term = readerSearch.trim().toLocaleLowerCase();
+    if (!term || !activeBook) return [];
+    return (activeBook.chapters ?? []).flatMap((chapter, index) => {
+      const text = chapter.text ?? "";
+      const matchIndex = text.toLocaleLowerCase().indexOf(term);
+      return matchIndex < 0 ? [] : [{ index, title: chapter.title || `Chapter ${index + 1}`, excerpt: text.slice(Math.max(0, matchIndex - 70), Math.min(text.length, matchIndex + term.length + 100)).replace(/\\s+/g, " ") }];
+    });
+  }, [activeBook, readerSearch]);
   const chapters = activeBook?.chapters ?? [];
   const activeChapter = readerIndex === null ? null : chapters[readerIndex] ?? null;
 
@@ -430,6 +439,16 @@ export function LibraryScreen() {
     window.scrollTo({ top: 0 });
   }
 
+  async function copyCurrentChapter() {
+    if (!activeChapter) return;
+    try {
+      await navigator.clipboard.writeText(activeChapter.text ?? "");
+      setError(null);
+    } catch {
+      setError("Clipboard access is unavailable. Select and copy the chapter text manually.");
+    }
+  }
+
   async function toggleBookmark() {
     if (!activeBook || readerIndex === null) return;
     const bookmarks = [...(activeBook.bookmarks ?? [])];
@@ -453,14 +472,14 @@ export function LibraryScreen() {
           <header className="reader-toolbar">
             <button className="quiet-button" onClick={() => { void saveReadingProgress(activeBook, readerIndex, window.scrollY); setReaderIndex(null); }}>← Back to book</button>
             <span className="reader-book-name">{activeBook.title}</span>
-            <div className="reader-toolbar-actions">
+            <div className="reader-toolbar-actions">\n              <button className="quiet-button" onClick={() => void copyCurrentChapter()}>Copy chapter</button>\n              <button className="quiet-button" onClick={() => setReaderFormat((format) => format === "normal" ? "sections" : "normal")}>{readerFormat === "normal" ? "Sections" : "Normal"}</button>
               <button className={`quiet-button ${bookmarked ? "is-bookmarked" : ""}`} onClick={() => void toggleBookmark()} aria-pressed={bookmarked}>{bookmarked ? "★ Bookmarked" : "☆ Bookmark"}</button>
               <button className="quiet-button" onClick={() => setFontScale((size) => Math.max(.8, Number((size - .1).toFixed(2))))} aria-label="Decrease text size">A−</button>
               <button className="quiet-button" onClick={() => setFontScale((size) => Math.min(1.5, Number((size + .1).toFixed(2))))} aria-label="Increase text size">A+</button>
             </div>
           </header>
-          <article className="reading-content" style={{ fontSize: `${fontScale}rem` }}>
-            <p className="eyebrow">CHAPTER {readerIndex + 1} OF {chapters.length}</p>
+          <article className={`reading-content format-${readerFormat}`} style={{ fontSize: `${fontScale}rem` }}>
+            <p className="eyebrow">CHAPTER {readerIndex + 1} OF {chapters.length}</p>\n            <label className="reader-search"><span>Search this novel</span><input type="search" value={readerSearch} onChange={(event) => setReaderSearch(event.target.value)} placeholder="Find text across chapters…" /></label>\n            {readerSearchMatches.length > 0 && <div className="reader-search-results">{readerSearchMatches.slice(0, 20).map((match) => <button key={match.index} onClick={() => openReader(match.index)}><strong>{match.title}</strong><span>{match.excerpt}</span></button>)}</div>}
             <h1>{activeChapter.title || `Chapter ${readerIndex + 1}`}</h1>
             <div className="reading-prose">
               {chapterParagraphs(activeChapter.text ?? "").map((paragraph, paragraphIndex) => {
