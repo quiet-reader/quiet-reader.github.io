@@ -70,7 +70,7 @@ function metadata(): DeviceMetadata {
 }
 async function digest(bytes: Uint8Array): Promise<string> {
   if (!globalThis.crypto?.subtle) throw new Error("SHA-256 requires HTTPS or localhost.");
-  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  const input = new Uint8Array(bytes.byteLength);\n  input.set(bytes);\n  const hash = await crypto.subtle.digest("SHA-256", input.buffer);
   return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 function toBase64(bytes: Uint8Array): string {
