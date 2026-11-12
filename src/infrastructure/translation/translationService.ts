@@ -55,7 +55,7 @@ async function readJson(response: Response): Promise<JsonRecord> {
   let data: JsonRecord;
   try { data = asRecord(JSON.parse(raw)); }
   catch { throw new Error("The translation provider returned an unreadable response."); }
-  if (!response.ok) { const error = asRecord(data.error); throw new Error(String(error.message ?? data.message ?? data.detail ?? data.error ?? `Translation request failed (HTTP ${response.status}).`)); }
+  if (!response.ok) { const error = asRecord(data["error"]); throw new Error(String(error["message"] ?? data["message"] ?? data["detail"] ?? data["error"] ?? `Translation request failed (HTTP ${response.status}).`)); }
   return data;
 }
 
@@ -97,7 +97,9 @@ export async function translateChapter(
       body: JSON.stringify({ q: text, target, format: "text" }),
     });
     const data = await readJson(response);
-    const translated = nested(asRecord(nested(data, "data")).translations instanceof Array ? (nested(data, "data") as JsonRecord).translations[0] : undefined, "translatedText");
+    const googleData = asRecord(data["data"]);
+    const translations = googleData["translations"];
+    const translated = Array.isArray(translations) ? nested(translations[0], "translatedText") : undefined;
     if (typeof translated !== "string" || !translated) throw new Error("Google returned no translated text.");
     return decodeHtmlEntities(translated);
   }
@@ -109,7 +111,7 @@ export async function translateChapter(
       body: JSON.stringify({ text: [text], target_lang: target.toUpperCase() }),
     });
     const data = await readJson(response);
-    const translations = data.translations;
+    const translations = data["translations"];
     const translated = Array.isArray(translations) ? nested(translations[0], "text") : undefined;
     if (typeof translated !== "string" || !translated) throw new Error("DeepL returned no translated text.");
     return translated;
@@ -121,7 +123,7 @@ export async function translateChapter(
     body: JSON.stringify({ q: text, source: "auto", target, format: "text", ...(source.apiKey ? { api_key: source.apiKey } : {}) }),
   });
   const data = await readJson(response);
-  const translated = data.translatedText;
+  const translated = data["translatedText"];
   if (typeof translated !== "string" || !translated) throw new Error("LibreTranslate returned no translated text.");
   return translated;
 }
