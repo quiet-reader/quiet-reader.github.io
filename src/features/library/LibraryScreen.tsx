@@ -1,3 +1,4 @@
+import { CollectionsPanel } from "@/features/collections/CollectionsPanel";
 import { exportBackup, getBackupDeviceName, restoreBackupFile } from "@/infrastructure/backup/backupService";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { freshBook } from "@/domain/book/factory";
@@ -478,6 +479,7 @@ export function LibraryScreen() {
 
           <nav className="library-filter-bar" aria-label="Library filters">
             {["all", "manual", "epub", "pdf", "gallery"].map((value) => <button key={value} className={category === value ? "active" : ""} onClick={() => setCategory(value)}>{value === "all" ? "All" : value === "manual" ? "My novels" : value.toUpperCase() + (value === "gallery" ? "" : "s")}</button>)}
+            <button className={category === "collections" ? "active" : ""} onClick={() => setCategory("collections")}>Collections</button>
             <button className={showFavorites ? "active" : ""} onClick={() => setShowFavorites((value) => !value)} aria-pressed={showFavorites}>★ Favorites</button>
             <label className="filter-select">Sort by<select value={sortMode} onChange={(event) => setSortMode(event.target.value)}><option value="recent">Recently updated</option><option value="title">Title A–Z</option><option value="rating-desc">Rating: high to low</option><option value="rating-asc">Rating: low to high</option><option value="characters-desc">Characters: most first</option><option value="characters-asc">Characters: fewest first</option></select></label>
             <label className="filter-select">Tag<select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}><option value="all">All tags</option>{[...new Set(records.flatMap((book) => book.tags ?? []))].sort().map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select></label>
@@ -491,7 +493,7 @@ export function LibraryScreen() {
           </section>
 
           {error && <div className="error-banner" role="alert">{error}</div>}
-          {loading ? <p className="empty-state">Opening your local library…</p> : visibleBooks.length === 0 ? (
+          {category === "collections" ? <CollectionsPanel records={records} onOpenBook={(id) => { setCategory("all"); setActiveBookId(id); }} /> : loading ? <p className="empty-state">Opening your local library…</p> : visibleBooks.length === 0 ? (
             <section className="empty-state">
               <div className="empty-icon">▤</div>
               <h2>{records.length === 0 ? "Your shelf is ready" : "No matching books"}</h2>
