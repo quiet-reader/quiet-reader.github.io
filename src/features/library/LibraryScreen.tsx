@@ -226,7 +226,6 @@ export function LibraryScreen() {
   function openReader(index: number) {
     if (!activeBook?.chapters?.[index]) return;
     setReaderIndex(index);
-    const saved = activeBook.progress?.chapter === index ? Number(activeBook.progress.offset) || 0 : 0;
     window.scrollTo({ top: 0 });
   }
 
@@ -377,7 +376,7 @@ export function LibraryScreen() {
                     ))}
                     {chapters.length === 0 && <li className="muted-copy">No chapters yet.</li>}
                   </ol>
-                  {(activeBook.bookmarks ?? []).length > 0 && <p className="muted-copy">{activeBook.bookmarks.length} saved bookmark{activeBook.bookmarks.length === 1 ? "" : "s"}</p>}
+                  {(activeBook.bookmarks?.length ?? 0) > 0 && <p className="muted-copy">{activeBook.bookmarks?.length ?? 0} saved bookmark{activeBook.bookmarks?.length === 1 ? "" : "s"}</p>}
                 </>
               )}
             </section>
