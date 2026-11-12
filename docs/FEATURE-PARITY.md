@@ -6,9 +6,9 @@ This is a migration tracker, not a claim of implementation. Mark a feature compl
 
 | Area | Required behaviour | Status |
 |---|---|---|
-| Application shell | Offline-capable local-first app; navigation and responsive desktop/mobile shells | Not migrated |
-| Library | Grid, expanded/compact views, filters, sort, tag colors, search across titles/authors/chapters/text | Not migrated |
-| Book details | Metadata, rating, tags, cover, lock/unlock, notes, history, gallery tab, EPUB export | Not migrated |
+| Application shell | Offline-capable local-first app; navigation and responsive desktop/mobile shells; V3 state slices and public feature boundaries | State slices ported; UI shell not migrated |
+| Library | Grid, expanded/compact views, filters, sort, tag colors, search across titles/authors/chapters/text; V3 pin/favorite and virtual collections | Domain service ported; UI not migrated |
+| Book details | Metadata, rating, tags, cover, lock/unlock, notes, history, gallery tab, EPUB export; V3 shared lock policy | Policy contract ported; UI and full enforcement audit not migrated |
 | Chapter editor | Create/edit/delete, image insertion, clipboard preview, TXT single/bulk/folder import, batch rename | Not migrated |
 | Reader | Chapter navigation/index, progress, search, reading format, copy, themes, width and text size | Not migrated |
 | Marks | Bookmarks, text/paragraph highlights, colors, notes, search and management | Not migrated |
@@ -18,7 +18,7 @@ This is a migration tracker, not a claim of implementation. Mark a feature compl
 | Image OCR | Local browser OCR, whitespace cleanup, translation, expandable result below image | Not migrated |
 | TTS | System speech and optional Kokoro WebGPU worker; failure isolation | Not migrated |
 | EPUB/PDF | Import/export and preservation of extracted content | Not migrated |
-| Backup | ZIP export, SHA-256 verification, assets, legacy JSON v2/v3, additive transactional restore | Not migrated |
+| Backup | ZIP export, SHA-256 verification, assets, legacy JSON v2/v3, additive transactional restore; V3 fingerprint, device provenance, history and collection metadata | Contracts only; exporter/importer not migrated |
 | Links | Novel-to-novel and chapter-to-chapter relationships and navigation | Not migrated |
 | Offline | Static hosting and service-worker cache/update behaviour | Not migrated |
 
