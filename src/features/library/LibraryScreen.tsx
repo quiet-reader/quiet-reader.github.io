@@ -1,4 +1,5 @@
 import { importEpub, importPdf, persistImportedBook } from "@/infrastructure/importers/documentImport";
+import { TranslationPanel } from "@/features/translation/TranslationPanel";
 import { CollectionsPanel } from "@/features/collections/CollectionsPanel";
 import { exportBackup, getBackupDeviceName, restoreBackupFile } from "@/infrastructure/backup/backupService";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -498,6 +499,7 @@ export function LibraryScreen() {
                 })}</p>;
               })}
             </div>
+            <TranslationPanel key={activeChapter.id ?? readerIndex} chapterText={activeChapter.text ?? ""} />
           </article>
           <footer className="reader-pagination">
             <button className="secondary-button" disabled={readerIndex === 0} onClick={() => changeReaderChapter(readerIndex - 1)}>← Previous</button>
