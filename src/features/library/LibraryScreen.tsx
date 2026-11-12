@@ -6,7 +6,7 @@ import {
   type LegacyLibraryRecord,
 } from "@/infrastructure/persistence/legacyDatabase";
 
-type ChapterRecord = { id?: string; title?: string; text?: string };
+type ChapterRecord = { id?: string; title?: string; text?: string; [field: string]: unknown };
 type BookRecord = LegacyLibraryRecord & {
   kind?: string;
   source?: string;
@@ -22,7 +22,7 @@ type BookRecord = LegacyLibraryRecord & {
 };
 
 function isBook(record: LegacyLibraryRecord): record is BookRecord {
-  return record.kind === "book" || Array.isArray(record.chapters) || record.source === "manual";
+  return record["kind"] === "book" || Array.isArray(record["chapters"]) || record["source"] === "manual";
 }
 
 function displayDate(value: unknown): string {
@@ -73,7 +73,7 @@ export function LibraryScreen() {
     setError(null);
     try {
       const record = freshBook("manual", title.trim());
-      await putLegacyRecord(record as LegacyLibraryRecord);
+      await putLegacyRecord(record as unknown as LegacyLibraryRecord);
       await refresh();
       setActiveBookId(record.id);
     } catch (cause) {
