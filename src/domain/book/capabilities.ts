@@ -21,6 +21,6 @@ export interface LockableBook {
 }
 
 export function canBook(book: LockableBook | null | undefined, capability: string): boolean {
-  if (!book || !(capability in BOOK_CAPABILITIES)) return false;
+  if (!book || !Object.hasOwn(BOOK_CAPABILITIES, capability)) return false;
   return book.locked !== true;
 }
