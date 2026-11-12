@@ -46,12 +46,16 @@ function decodeHtmlEntities(value: string): string {
   return element.value;
 }
 
-async function readJson(response: Response): Promise<Record<string, any>> {
+type JsonRecord = Record<string, unknown>;
+function asRecord(value: unknown): JsonRecord { return value && typeof value === "object" ? value as JsonRecord : {}; }
+function nested(value: unknown, key: string): unknown { return asRecord(value)[key]; }
+
+async function readJson(response: Response): Promise<JsonRecord> {
   const raw = await response.text();
-  let data: Record<string, any>;
-  try { data = JSON.parse(raw) as Record<string, any>; }
+  let data: JsonRecord;
+  try { data = asRecord(JSON.parse(raw)); }
   catch { throw new Error("The translation provider returned an unreadable response."); }
-  if (!response.ok) throw new Error(String(data.error?.message ?? data.message ?? data.detail ?? data.error ?? `Translation request failed (HTTP ${response.status}).`));
+  if (!response.ok) { const error = asRecord(data.error); throw new Error(String(error.message ?? data.message ?? data.detail ?? data.error ?? `Translation request failed (HTTP ${response.status}).`)); }
   return data;
 }
 
@@ -78,9 +82,10 @@ export async function translateChapter(
     }
     const raw = await response.text();
     if (!response.ok) throw new Error(`Google Translate Free rejected the request (HTTP ${response.status}).`);
-    let data: any;
+    let data: unknown;
     try { data = JSON.parse(raw); } catch { throw new Error("Google Translate Free returned an unreadable response."); }
-    const result = Array.isArray(data?.[0]) ? data[0].map((part: any[]) => part?.[0] ?? "").join("") : "";
+    const rows = Array.isArray(data) ? data[0] : undefined;
+    const result = Array.isArray(rows) ? rows.map((part) => Array.isArray(part) ? String(part[0] ?? "") : "").join("") : "";
     if (!result) throw new Error("Google Translate Free returned no translated text.");
     return result;
   }
@@ -92,7 +97,7 @@ export async function translateChapter(
       body: JSON.stringify({ q: text, target, format: "text" }),
     });
     const data = await readJson(response);
-    const translated = data.data?.translations?.[0]?.translatedText;
+    const translated = nested(asRecord(nested(data, "data")).translations instanceof Array ? (nested(data, "data") as JsonRecord).translations[0] : undefined, "translatedText");
     if (typeof translated !== "string" || !translated) throw new Error("Google returned no translated text.");
     return decodeHtmlEntities(translated);
   }
@@ -104,7 +109,8 @@ export async function translateChapter(
       body: JSON.stringify({ text: [text], target_lang: target.toUpperCase() }),
     });
     const data = await readJson(response);
-    const translated = data.translations?.[0]?.text;
+    const translations = data.translations;
+    const translated = Array.isArray(translations) ? nested(translations[0], "text") : undefined;
     if (typeof translated !== "string" || !translated) throw new Error("DeepL returned no translated text.");
     return translated;
   }
@@ -115,6 +121,7 @@ export async function translateChapter(
     body: JSON.stringify({ q: text, source: "auto", target, format: "text", ...(source.apiKey ? { api_key: source.apiKey } : {}) }),
   });
   const data = await readJson(response);
-  if (typeof data.translatedText !== "string" || !data.translatedText) throw new Error("LibreTranslate returned no translated text.");
-  return data.translatedText;
+  const translated = data.translatedText;
+  if (typeof translated !== "string" || !translated) throw new Error("LibreTranslate returned no translated text.");
+  return translated;
 }
