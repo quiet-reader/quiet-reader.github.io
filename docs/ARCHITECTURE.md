@@ -23,12 +23,16 @@ Quiet Reader is a local-first browser application, not a server-rendered content
 src/
   app/                    # bootstrap, composition, route/screen registry
   domain/                 # framework-independent entities and invariants
+    book/                   # book factory and shared capabilities
+    collections/            # stable virtual-collection references
   application/             # use cases and ports
+    collections/            # virtual collection membership and organization
   infrastructure/
     persistence/           # legacy IndexedDB and future repositories
     files/                 # import/export and file adapters
     workers/               # CPU-intensive work
     providers/             # translation, OCR, speech adapters
+  state/                   # feature-owned transient state slices
   features/
     library/
     reader/
