@@ -35,8 +35,8 @@ function isCollectionReference(value: unknown): value is CollectionItemReference
   const ref = value as Record<string, unknown>;
   if (typeof ref["bookId"] !== "string") return false;
   if (ref["type"] === "book") return true;
-  if (ref.type === "chapter") return typeof ref["chapterId"] === "string";
-  if (ref.type === "image") return typeof ref["imageId"] === "string";
+  if (ref["type"] === "chapter") return typeof ref["chapterId"] === "string";
+  if (ref["type"] === "image") return typeof ref["imageId"] === "string";
   return false;
 }
 
