@@ -63,7 +63,11 @@ function chapterParagraphs(text: string): string[] {
 
 export function LibraryScreen() {
   const [records, setRecords] = useState<BookRecord[]>([]);
-  const [query, setQuery] = useState("");\n  const [category, setCategory] = useState("all");\n  const [sortMode, setSortMode] = useState("recent");\n  const [tagFilter, setTagFilter] = useState("all");\n  const [showFavorites, setShowFavorites] = useState(false);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [sortMode, setSortMode] = useState("recent");
+  const [tagFilter, setTagFilter] = useState("all");
+  const [showFavorites, setShowFavorites] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +79,8 @@ export function LibraryScreen() {
   const [draftImages, setDraftImages] = useState<ChapterImage[]>([]);
   const [readerIndex, setReaderIndex] = useState<number | null>(null);
   const [fontScale, setFontScale] = useState(1);
-  const [importing, setImporting] = useState(false);\n  const [backupBusy, setBackupBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const refresh = useCallback(async () => {
@@ -501,9 +506,11 @@ export function LibraryScreen() {
                   <span className="book-card-body">
                     <strong>{book.title || "Untitled book"}</strong>
                     <span>{book.author || "Unknown author"}</span>
-                    <span className="book-card-meta">{book.chapters?.length ?? 0} chapters · {displayDate(book.updated)}</span>\n                    <span className="book-card-tags">{(book.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</span>
+                    <span className="book-card-meta">{book.chapters?.length ?? 0} chapters · {displayDate(book.updated)}</span>
+                    <span className="book-card-tags">{(book.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</span>
                   </span>
-                  {book.locked && <span className="lock-indicator" aria-label="Locked">● Locked</span>}\n                  <span className="book-card-flags">{book["favorite"] ? "★" : ""}{book["pinned"] ? " 📌" : ""}</span>
+                  {book.locked && <span className="lock-indicator" aria-label="Locked">● Locked</span>}
+                  <span className="book-card-flags">{book["favorite"] ? "★" : ""}{book["pinned"] ? " 📌" : ""}</span>
                 </button>
               ))}
             </section>
@@ -540,7 +547,8 @@ export function LibraryScreen() {
                     <button className="quiet-button" onClick={() => setActiveBookId(null)}>Close</button>
                   </div>
                   <div className="detail-actions">
-                    <button className="secondary-button" onClick={() => openEditor(null)} disabled={!canBook(activeBook, "chapter.create")}>+ Add chapter</button>\n                    <label className="secondary-button import-txt-button">Import TXT chapters<input type="file" accept=".txt,text/plain" multiple hidden disabled={!canBook(activeBook, "chapter.create") || saving} onChange={(event) => { void importTxtChapters(event.target.files); event.currentTarget.value = ""; }} /></label>
+                    <button className="secondary-button" onClick={() => openEditor(null)} disabled={!canBook(activeBook, "chapter.create")}>+ Add chapter</button>
+                    <label className="secondary-button import-txt-button">Import TXT chapters<input type="file" accept=".txt,text/plain" multiple hidden disabled={!canBook(activeBook, "chapter.create") || saving} onChange={(event) => { void importTxtChapters(event.target.files); event.currentTarget.value = ""; }} /></label>
                     <button className="secondary-button" onClick={() => { const next = { ...activeBook, locked: !activeBook.locked, updated: Date.now() }; void persistBook(next).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not update lock.")); }}>{activeBook.locked ? "Unlock editing" : "Lock editing"}</button>
                     <span className="muted-copy">{activeBook.locked ? "Locked — editing is disabled" : "Changes are saved to your existing local library"}</span>
                   </div>
