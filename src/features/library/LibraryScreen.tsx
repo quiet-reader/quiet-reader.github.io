@@ -72,10 +72,8 @@ export function LibraryScreen() {
   const [draftText, setDraftText] = useState("");
   const [draftImages, setDraftImages] = useState<ChapterImage[]>([]);
   const [readerIndex, setReaderIndex] = useState<number | null>(null);
-  const [readerOffset, setReaderOffset] = useState(0);
   const [fontScale, setFontScale] = useState(1);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
-  const readerBodyRef = useRef<HTMLElement>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -206,8 +204,7 @@ export function LibraryScreen() {
       setError("Unlock this book before deleting chapters."); return;
     }
     if (!window.confirm(`Delete "${activeBook.chapters?.[index]?.title || `Chapter ${index + 1}`}"? This cannot be undone.`)) return;
-    const removed = activeBook.chapters?.[index];
-    if (!removed) return;
+    if (!activeBook.chapters?.[index]) return;
     const now = Date.now();
     const updated = { ...activeBook, chapters: activeBook.chapters!.filter((_, i) => i !== index), updated: now };
     try {
@@ -230,7 +227,6 @@ export function LibraryScreen() {
     if (!activeBook?.chapters?.[index]) return;
     setReaderIndex(index);
     const saved = activeBook.progress?.chapter === index ? Number(activeBook.progress.offset) || 0 : 0;
-    setReaderOffset(saved);
     window.scrollTo({ top: 0 });
   }
 
@@ -246,7 +242,6 @@ export function LibraryScreen() {
     const offset = window.scrollY;
     void saveReadingProgress(activeBook, readerIndex ?? 0, offset);
     setReaderIndex(next);
-    setReaderOffset(0);
     window.scrollTo({ top: 0 });
   }
 
@@ -279,7 +274,7 @@ export function LibraryScreen() {
               <button className="quiet-button" onClick={() => setFontScale((size) => Math.min(1.5, Number((size + .1).toFixed(2))))} aria-label="Increase text size">A+</button>
             </div>
           </header>
-          <article className="reading-content" ref={readerBodyRef} style={{ fontSize: `${fontScale}rem` }}>
+          <article className="reading-content" style={{ fontSize: `${fontScale}rem` }}>
             <p className="eyebrow">CHAPTER {readerIndex + 1} OF {chapters.length}</p>
             <h1>{activeChapter.title || `Chapter ${readerIndex + 1}`}</h1>
             <div className="reading-prose">
