@@ -7,9 +7,9 @@ A local-first migration of the existing Quiet Reader browser application.
 ## Source baseline
 
 - Source repository: [quiet-reader-webapp](https://github.com/quiet-reader/quiet-reader-webapp)
-- Source branch: `V2-feature`
-- Pinned source commit: `755bdd2f345c5ad5da2aaab0e8dbb940da70a691`
-- Architecture and data contracts: source `guide/ARCHITECTURE.md`, `guide/DATA-COMPATIBILITY.md`, `guide/FEATURE-INVENTORY.md`, `guide/FEATURE-CHECKLIST.md`.
+- Source branch: `V3-feature` (includes the V2 history)
+- Pinned source commit: `68fa6a3e50be4793ef6b8897b477a6d52f8ccd62`
+- Architecture and data contracts: source `guide/ARCHITECTURE.md`, `guide/DATA-CONTRACT.md`, `guide/DATA-COMPATIBILITY.md`, `guide/FEATURE-OWNERSHIP.md`, `guide/DEPENDENCY-MAP.md`, `guide/SHARED-POLICIES.md`, `guide/FEATURE-INVENTORY.md`, `guide/FEATURE-CHECKLIST.md`. See [V3-MIGRATION.md](docs/V3-MIGRATION.md) for the V3 additions and port status.
 
 ## Stack
 
