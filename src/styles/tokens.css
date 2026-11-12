@@ -1,0 +1,15 @@
+:root {
+  color-scheme: dark;
+  font-family: "Gotham Pro", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --qr-bg: #111318;
+  --qr-surface: #191d25;
+  --qr-surface-raised: #202632;
+  --qr-text: #edf0f5;
+  --qr-muted: #9ba5b4;
+  --qr-border: #303846;
+  --qr-accent: #a8b9d5;
+  --qr-radius: 14px;
+}
