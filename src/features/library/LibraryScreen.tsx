@@ -1,3 +1,4 @@
+import { importEpub, importPdf, persistImportedBook } from "@/infrastructure/importers/documentImport";
 import { CollectionsPanel } from "@/features/collections/CollectionsPanel";
 import { exportBackup, getBackupDeviceName, restoreBackupFile } from "@/infrastructure/backup/backupService";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -126,6 +127,19 @@ export function LibraryScreen() {
   async function persistBook(updated: BookRecord) {
     await putLegacyRecord(updated);
     setRecords((current) => current.map((book) => book.id === updated.id ? updated : book));
+  }
+
+  async function importDocument(file: File | undefined, kind: "epub" | "pdf") {
+    if (!file) return;
+    setImporting(true); setError(null);
+    try {
+      const book = kind === "epub" ? await importEpub(file) : await importPdf(file);
+      await persistImportedBook(book);
+      await refresh();
+      setActiveBookId(book.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : `Could not import the ${kind.toUpperCase()}.`);
+    } finally { setImporting(false); }
   }
 
   async function createBackup() {
@@ -474,7 +488,7 @@ export function LibraryScreen() {
               <h1>Library</h1>
               <p className="library-subtitle">Your books stay in this browser. No account or cloud library required.</p>
             </div>
-            <div className="library-top-actions"><button className="secondary-button" onClick={() => void createBackup()} disabled={backupBusy}>{backupBusy ? "Working…" : "Export backup"}</button><label className="secondary-button import-txt-button">Restore backup<input type="file" accept=".zip,.json,application/zip,application/json" hidden disabled={backupBusy} onChange={(event) => { void restoreBackup(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label><label className="secondary-button import-txt-button">{importing ? "Importing…" : "Import TXT / folder"}<input type="file" accept=".txt,text/plain" multiple hidden disabled={importing} onChange={(event) => { if (event.target.files) void importTxtFiles(event.target.files); event.currentTarget.value = ""; }} /></label><button className="primary-button" onClick={() => void createNovel()} disabled={saving}>＋ New novel</button></div>
+            <div className="library-top-actions"><label className="secondary-button import-txt-button">Import EPUB<input type="file" accept=".epub,application/epub+zip" hidden disabled={importing} onChange={(event) => { void importDocument(event.target.files?.[0], "epub"); event.currentTarget.value = ""; }} /></label><label className="secondary-button import-txt-button">Import PDF<input type="file" accept=".pdf,application/pdf" hidden disabled={importing} onChange={(event) => { void importDocument(event.target.files?.[0], "pdf"); event.currentTarget.value = ""; }} /></label><button className="secondary-button" onClick={() => void createBackup()} disabled={backupBusy}>{backupBusy ? "Working…" : "Export backup"}</button><label className="secondary-button import-txt-button">Restore backup<input type="file" accept=".zip,.json,application/zip,application/json" hidden disabled={backupBusy} onChange={(event) => { void restoreBackup(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label><label className="secondary-button import-txt-button">{importing ? "Importing…" : "Import TXT / folder"}<input type="file" accept=".txt,text/plain" multiple hidden disabled={importing} onChange={(event) => { if (event.target.files) void importTxtFiles(event.target.files); event.currentTarget.value = ""; }} /></label><button className="primary-button" onClick={() => void createNovel()} disabled={saving}>＋ New novel</button></div>
           </header>
 
           <nav className="library-filter-bar" aria-label="Library filters">
