@@ -25,11 +25,15 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: npm install --no-audit --no-fund --loglevel verbose
+        run: npm install --legacy-peer-deps --no-audit --no-fund
       - name: Typecheck and build
         run: npm run build
+      - name: Unit tests
+        run: npm test
       - name: Lint
         run: npm run lint
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
