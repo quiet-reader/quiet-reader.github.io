@@ -1,5 +1,4 @@
 import type { CollectionBook, CollectionItemReference, CollectionTarget, UserCollection } from "@/domain/collections/contracts";
-import { canBook } from "@/domain/book/capabilities";
 import type { LegacyItemRepository } from "@/infrastructure/persistence/legacyDatabase";
 
 const STORAGE_KEY = "qrCollections";
@@ -109,9 +108,6 @@ export function createCollectionService({
     },
 
     async toggle(type: CollectionTarget, book: CollectionBook, childIndex: number | undefined, collectionId: string): Promise<boolean> {
-      if (type !== "book" && !canBook(book, "gallery.manage") && type === "image") {
-        throw new Error("This book is locked.");
-      }
       const reference = await referenceFor(type, book, childIndex);
       if (!reference) return false;
       const collections = read();
