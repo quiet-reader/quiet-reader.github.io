@@ -47,10 +47,11 @@ describe("translateChapter", () => {
   });
 
   it("uses a form-encoded POST for the unofficial Google endpoint", async () => {
-    const fetcher = vi.fn(async () => new Response(JSON.stringify([[["你好", "hello"]]]), { status: 200 }));
+    const calls: RequestInit[] = [];
+    const fetcher: typeof fetch = async (_input, init) => { calls.push(init ?? {}); return new Response(JSON.stringify([[["你好", "hello"]]]), { status: 200 }); };
     const result = await translateChapter({ ...source, type: "googleFree" }, "hello", "zh-CN", fetcher);
     expect(result).toBe("你好");
-    expect(fetcher.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(calls[0]?.method).toBe("POST");
   });
 
   it("rejects empty text, missing endpoints, and manual providers", async () => {
