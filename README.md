@@ -24,7 +24,7 @@ A local-first migration of the existing Quiet Reader browser application.
 Requires Node.js 20.19+ or 22.12+.
 
 ```sh
-npm install
+npm install --legacy-peer-deps
 npm run dev
 npm run typecheck
 npm run lint
