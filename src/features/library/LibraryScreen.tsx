@@ -4,6 +4,7 @@ import { canBook } from "@/domain/book/capabilities";
 import {
   getAllLegacyRecords,
   putLegacyRecord,
+  putLegacyRecords,
   type LegacyLibraryRecord,
 } from "@/infrastructure/persistence/legacyDatabase";
 
@@ -168,17 +169,67 @@ export function LibraryScreen() {
   }
 
   async function moveChapter(index: number, delta: -1 | 1) {
-    if (!activeBook || !canBook(activeBook, "chapter.reorder")) { setError("Unlock this book before reordering chapters."); return; }
+    if (!activeBook || !canBook(activeBook, "chapter.reorder")) {
+      setError("Unlock this book before reordering chapters."); return;
+    }
     const target = index + delta;
-    const next = [...(activeBook.chapters ?? [])];
-    if (target < 0 || target >= next.length) return;
-    const currentChapter = next[index];
-    const targetChapter = next[target];
+    const nextChapters = [...(activeBook.chapters ?? [])];
+    const currentChapter = nextChapters[index];
+    const targetChapter = nextChapters[target];
     if (!currentChapter || !targetChapter) return;
-    next[index] = targetChapter;
-    next[target] = currentChapter;
-    try { await persistBook({ ...activeBook, chapters: next, updated: Date.now() }); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not reorder chapters."); }
+
+    // V3 stores bookmarks, progress and incoming chapter links as indexes.
+    // Remap every reference atomically when two chapter positions are swapped.
+    const swapIndex = (value: unknown): number => {
+      const valueIndex = Number(value);
+      if (!Number.isInteger(valueIndex)) return valueIndex;
+      return valueIndex === index ? target : valueIndex === target ? index : valueIndex;
+    };
+    [nextChapters[index], nextChapters[target]] = [targetChapter, currentChapter];
+    const allRecords = await getAllLegacyRecords();
+    const changedRecords: LegacyLibraryRecord[] = [];
+    for (const record of allRecords) {
+      if (!isBook(record)) continue;
+      let changed = false;
+      const chaptersForBook = record.id === activeBook.id ? nextChapters : record.chapters ?? [];
+      for (const chapter of chaptersForBook) {
+        for (const link of (chapter["links"] as Array<Record<string, unknown>> | undefined) ?? []) {
+          if (link["targetBookId"] === activeBook.id && Number.isInteger(Number(link["targetChapterIndex"]))) {
+            const oldIndex = Number(link["targetChapterIndex"]);
+            const newIndex = swapIndex(oldIndex);
+            if (newIndex !== oldIndex) { link["targetChapterIndex"] = newIndex; changed = true; }
+          }
+        }
+      }
+      if (record.id === activeBook.id) {
+        for (const bookmark of record.bookmarks ?? []) {
+          const oldIndex = Number(bookmark.chapter);
+          const newIndex = swapIndex(oldIndex);
+          if (newIndex !== oldIndex) { bookmark.chapter = newIndex; changed = true; }
+        }
+        if (record.progress) {
+          const oldIndex = Number(record.progress.chapter);
+          const newIndex = swapIndex(oldIndex);
+          if (newIndex !== oldIndex) { record.progress = { ...record.progress, chapter: newIndex }; changed = true; }
+        }
+        const readingHistory = record["readingHistory"] as Array<Record<string, unknown>> | undefined;
+        for (const entry of readingHistory ?? []) {
+          const oldIndex = Number(entry["chapterIndex"]);
+          const newIndex = swapIndex(oldIndex);
+          if (newIndex !== oldIndex) { entry["chapterIndex"] = newIndex; changed = true; }
+        }
+        record.chapters = nextChapters;
+        record.updated = Date.now();
+        changed = true;
+      }
+      if (changed) changedRecords.push(record);
+    }
+    try {
+      await putLegacyRecords(changedRecords);
+      setRecords((current) => current.map((book) => changedRecords.find((item) => item.id === book.id) as BookRecord ?? book));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not reorder chapters and preserve their references.");
+    }
   }
 
   async function createNovel() {
