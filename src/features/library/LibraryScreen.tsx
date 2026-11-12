@@ -73,6 +73,7 @@ export function LibraryScreen() {
   const [draftImages, setDraftImages] = useState<ChapterImage[]>([]);
   const [readerIndex, setReaderIndex] = useState<number | null>(null);
   const [fontScale, setFontScale] = useState(1);
+  const [importing, setImporting] = useState(false);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const refresh = useCallback(async () => {
@@ -105,6 +106,73 @@ export function LibraryScreen() {
   async function persistBook(updated: BookRecord) {
     await putLegacyRecord(updated);
     setRecords((current) => current.map((book) => book.id === updated.id ? updated : book));
+  }
+
+  async function importTxtFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList).filter((file) => /\\.txt$/i.test(file.name));
+    if (!files.length) { setError("No .txt files were selected."); return; }
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    files.sort((a, b) => collator.compare(
+      (a as File & { webkitRelativePath?: string }).webkitRelativePath || a.name,
+      (b as File & { webkitRelativePath?: string }).webkitRelativePath || b.name,
+    ));
+    setImporting(true); setError(null);
+    try {
+      const chapters: ChapterRecord[] = [];
+      for (const file of files) {
+        const text = (await file.text()).replace(/^\\uFEFF/, "").replace(/\\r\\n?/g, "\\n").trim();
+        if (!text) continue;
+        chapters.push({
+          id: makeId("chapter"),
+          title: file.name.replace(/\\.txt$/i, "") || "Untitled chapter",
+          text, images: [], createdAt: Date.now(), updatedAt: Date.now(), history: [],
+        });
+      }
+      if (!chapters.length) throw new Error("The selected text files are empty.");
+      const first = files[0] as File & { webkitRelativePath?: string };
+      const relative = first.webkitRelativePath || "";
+      const folder = relative.includes("/") ? relative.split("/")[0] : "";
+      const fallbackTitle = chapters[0].title?.replace(/\\s*[-_]?(chapter|ch|part)\\s*\\d+.*$/i, "").trim();
+      const title = folder || fallbackTitle || chapters[0].title || "Imported novel";
+      const book = { ...freshBook("manual", title), chapters, updated: Date.now() };
+      await putLegacyRecord(book as unknown as LegacyLibraryRecord);
+      await refresh();
+      setActiveBookId(book.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not import the TXT files.");
+    } finally { setImporting(false); }
+  }
+
+  async function importTxtChapters(fileList: FileList | null) {
+    if (!activeBook || !fileList?.length) return;
+    if (!canBook(activeBook, "chapter.create")) { setError("Unlock this book before importing chapters."); return; }
+    const files = Array.from(fileList).filter((file) => /\\.txt$/i.test(file.name))
+      .sort((a, b) => new Intl.Collator(undefined, { numeric: true, sensitivity: "base" }).compare(a.name, b.name));
+    if (!files.length) { setError("No .txt files were selected."); return; }
+    setSaving(true); setError(null);
+    try {
+      const imported: ChapterRecord[] = [];
+      for (const file of files) {
+        const text = (await file.text()).replace(/^\\uFEFF/, "").replace(/\\r\\n?/g, "\\n").trim();
+        if (!text) continue;
+        imported.push({ id: makeId("chapter"), title: file.name.replace(/\\.txt$/i, ""),
+          text, images: [], createdAt: Date.now(), updatedAt: Date.now(), history: [] });
+      }
+      if (!imported.length) throw new Error("The selected TXT files are empty.");
+      await persistBook({ ...activeBook, chapters: [...(activeBook.chapters ?? []), ...imported], updated: Date.now() });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not import chapters.");
+    } finally { setSaving(false); }
+  }
+
+  async function moveChapter(index: number, delta: -1 | 1) {
+    if (!activeBook || !canBook(activeBook, "chapter.reorder")) { setError("Unlock this book before reordering chapters."); return; }
+    const target = index + delta;
+    const next = [...(activeBook.chapters ?? [])];
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    try { await persistBook({ ...activeBook, chapters: next, updated: Date.now() }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not reorder chapters."); }
   }
 
   async function createNovel() {
@@ -302,7 +370,7 @@ export function LibraryScreen() {
               <h1>Library</h1>
               <p className="library-subtitle">Your books stay in this browser. No account or cloud library required.</p>
             </div>
-            <button className="primary-button" onClick={() => void createNovel()} disabled={saving}>＋ New novel</button>
+            <div className="library-top-actions"><label className="secondary-button import-txt-button">{importing ? "Importing…" : "Import TXT / folder"}<input type="file" accept=".txt,text/plain" multiple hidden disabled={importing} onChange={(event) => { if (event.target.files) void importTxtFiles(event.target.files); event.currentTarget.value = ""; }} /></label><button className="primary-button" onClick={() => void createNovel()} disabled={saving}>＋ New novel</button></div>
           </header>
 
           <section className="library-toolbar" aria-label="Library tools">
@@ -358,7 +426,7 @@ export function LibraryScreen() {
                     <button className="quiet-button" onClick={() => setActiveBookId(null)}>Close</button>
                   </div>
                   <div className="detail-actions">
-                    <button className="secondary-button" onClick={() => openEditor(null)} disabled={!canBook(activeBook, "chapter.create")}>+ Add chapter</button>
+                    <button className="secondary-button" onClick={() => openEditor(null)} disabled={!canBook(activeBook, "chapter.create")}>+ Add chapter</button>\n                    <label className="secondary-button import-txt-button">Import TXT chapters<input type="file" accept=".txt,text/plain" multiple hidden disabled={!canBook(activeBook, "chapter.create") || saving} onChange={(event) => { void importTxtChapters(event.target.files); event.currentTarget.value = ""; }} /></label>
                     <button className="secondary-button" onClick={() => { const next = { ...activeBook, locked: !activeBook.locked, updated: Date.now() }; void persistBook(next).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not update lock.")); }}>{activeBook.locked ? "Unlock editing" : "Lock editing"}</button>
                     <span className="muted-copy">{activeBook.locked ? "Locked — editing is disabled" : "Changes are saved to your existing local library"}</span>
                   </div>
