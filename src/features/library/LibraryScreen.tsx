@@ -442,6 +442,8 @@ export function LibraryScreen() {
                       <li key={chapter.id ?? `${activeBook.id}-${index}`}>
                         <div className="chapter-row-title"><strong>{chapter.title || `Chapter ${index + 1}`}</strong><span className="muted-copy">{(chapter.text ?? "").length.toLocaleString()} characters</span></div>
                         <div className="chapter-row-actions">
+                          <button className="quiet-button" onClick={() => void moveChapter(index, -1)} disabled={!canBook(activeBook, "chapter.reorder") || index === 0} aria-label="Move chapter up">↑</button>
+                          <button className="quiet-button" onClick={() => void moveChapter(index, 1)} disabled={!canBook(activeBook, "chapter.reorder") || index === chapters.length - 1} aria-label="Move chapter down">↓</button>
                           <button className="quiet-button" onClick={() => openReader(index)}>Read</button>
                           <button className="quiet-button" onClick={() => openEditor(index)} disabled={!canBook(activeBook, "chapter.edit")}>Edit</button>
                           <button className="quiet-button danger-button" onClick={() => void deleteChapter(index)} disabled={!canBook(activeBook, "chapter.delete")}>Delete</button>
