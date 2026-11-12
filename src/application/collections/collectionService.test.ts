@@ -54,10 +54,10 @@ describe("V3 virtual collections", () => {
     const collection = service.create("Favorites");
     const added = await service.toggle("chapter", book, 0, collection.id);
     expect(added).toBe(true);
-    expect(book.chapters?.[0].id).toBe("id-2");
+    expect(book.chapters?.[0]?.id).toBe("id-2");
     expect(saved).toHaveLength(1);
-    expect(service.list()[0].items).toEqual([
-      { type: "chapter", bookId: "book-1", chapterId: "id-1" },
+    expect(service.list()[0]?.items).toEqual([
+      { type: "chapter", bookId: "book-1", chapterId: "id-2" },
     ]);
     expect(await service.toggle("chapter", book, 0, collection.id)).toBe(false);
     expect(service.list()[0].items).toEqual([]);
