@@ -33,10 +33,10 @@ function parseCollections(raw: string | null): UserCollection[] {
 function isCollectionReference(value: unknown): value is CollectionItemReference {
   if (!value || typeof value !== "object") return false;
   const ref = value as Record<string, unknown>;
-  if (typeof ref.bookId !== "string") return false;
-  if (ref.type === "book") return true;
-  if (ref.type === "chapter") return typeof ref.chapterId === "string";
-  if (ref.type === "image") return typeof ref.imageId === "string";
+  if (typeof ref["bookId"] !== "string") return false;
+  if (ref["type"] === "book") return true;
+  if (ref.type === "chapter") return typeof ref["chapterId"] === "string";
+  if (ref.type === "image") return typeof ref["imageId"] === "string";
   return false;
 }
 
