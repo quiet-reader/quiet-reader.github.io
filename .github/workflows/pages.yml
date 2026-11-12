@@ -2,7 +2,7 @@ name: Build and deploy Quiet Reader
 
 on:
   push:
-    branches: [main]
+    branches: [main, vite-typescript-port]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund --loglevel verbose
       - name: Typecheck and build
         run: npm run build
       - name: Lint
@@ -35,7 +35,7 @@ jobs:
         with:
           path: ./dist
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
