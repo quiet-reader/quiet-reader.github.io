@@ -272,7 +272,7 @@ export async function parseBackupFile(file: File): Promise<BackupRestoreResult> 
   if (!checksums) throw new Error("The checksum list is missing.");
   const checksumText = await checksums.async("string");
   const checksumMap = new Map(checksumText.trim().split(/\r?\n/).map((line) => {
-    const match = /^([a-f0-9]{64})  (.+)$/.exec(line);
+    const match = /^([a-f0-9]{64}) {2}(.+)$/.exec(line);
     return match ? [match[2] ?? "", match[1] ?? ""] as const : ["", ""] as const;
   }).filter(([path]) => Boolean(path)));
   if (checksumMap.get("manifest.json") !== await digest(encoder.encode(manifestText))) throw new Error("The manifest checksum does not match.");
