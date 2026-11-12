@@ -60,7 +60,7 @@ describe("V3 virtual collections", () => {
       { type: "chapter", bookId: "book-1", chapterId: "id-2" },
     ]);
     expect(await service.toggle("chapter", book, 0, collection.id)).toBe(false);
-    expect(service.list()[0].items).toEqual([]);
+    expect(service.list()[0]?.items).toEqual([]);
   });
 
   it("keeps pin and favorite flags on the existing book record", async () => {
@@ -74,9 +74,9 @@ describe("V3 virtual collections", () => {
   it("removes stale collection references but preserves valid books", async () => {
     const collection = service.create("Shelf");
     await service.toggle("book", book, undefined, collection.id);
-    const refs = service.list()[0].items;
+    const refs = service.list()[0]?.items;
     expect(refs).toEqual([{ type: "book", bookId: "book-1" }]);
     await service.pruneStaleReferences();
-    expect(service.list()[0].items).toHaveLength(1);
+    expect(service.list()[0]?.items).toHaveLength(1);
   });
 });
