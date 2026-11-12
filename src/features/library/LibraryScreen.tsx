@@ -63,7 +63,7 @@ function chapterParagraphs(text: string): string[] {
 
 export function LibraryScreen() {
   const [records, setRecords] = useState<BookRecord[]>([]);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState("");\n  const [category, setCategory] = useState("all");\n  const [sortMode, setSortMode] = useState("recent");\n  const [tagFilter, setTagFilter] = useState("all");\n  const [showFavorites, setShowFavorites] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,12 +94,24 @@ export function LibraryScreen() {
 
   const visibleBooks = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
-    const list = !normalized ? [...records] : records.filter((book) => [
+    let list = !normalized ? [...records] : records.filter((book) => [
       book.title, book.author, ...(book.chapters ?? []).flatMap((chapter) => [chapter.title, chapter.text]),
     ].some((value) => String(value ?? "").toLocaleLowerCase().includes(normalized)));
-    return list.sort((a, b) => Number(Boolean(b["pinned"])) - Number(Boolean(a["pinned"])) ||
-      Number(b.updated ?? 0) - Number(a.updated ?? 0));
-  }, [query, records]);
+    if (category !== "all") list = list.filter((book) => (book.kind ?? book.source ?? "manual") === category);
+    if (showFavorites) list = list.filter((book) => Boolean(book["favorite"]));
+    if (tagFilter !== "all") list = list.filter((book) => (book.tags ?? []).includes(tagFilter));
+    const characters = (book: BookRecord) => (book.chapters ?? []).reduce((sum, chapter) => sum + (chapter.text?.length ?? 0), 0);
+    return list.sort((a, b) => {
+      const pinned = Number(Boolean(b["pinned"])) - Number(Boolean(a["pinned"]));
+      if (pinned) return pinned;
+      if (sortMode === "title") return String(a.title ?? "").localeCompare(String(b.title ?? ""), undefined, { sensitivity: "base" });
+      if (sortMode === "rating-asc") return Number(a.rating ?? 0) - Number(b.rating ?? 0);
+      if (sortMode === "rating-desc") return Number(b.rating ?? 0) - Number(a.rating ?? 0);
+      if (sortMode === "characters-asc") return characters(a) - characters(b);
+      if (sortMode === "characters-desc") return characters(b) - characters(a);
+      return Number(b.updated ?? 0) - Number(a.updated ?? 0);
+    });
+  }, [query, records, category, sortMode, tagFilter, showFavorites]);
 
   const activeBook = records.find((book) => book.id === activeBookId) ?? null;
   const chapters = activeBook?.chapters ?? [];
@@ -459,6 +471,13 @@ export function LibraryScreen() {
             <div className="library-top-actions"><button className="secondary-button" onClick={() => void createBackup()} disabled={backupBusy}>{backupBusy ? "Working…" : "Export backup"}</button><label className="secondary-button import-txt-button">Restore backup<input type="file" accept=".zip,.json,application/zip,application/json" hidden disabled={backupBusy} onChange={(event) => { void restoreBackup(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label><label className="secondary-button import-txt-button">{importing ? "Importing…" : "Import TXT / folder"}<input type="file" accept=".txt,text/plain" multiple hidden disabled={importing} onChange={(event) => { if (event.target.files) void importTxtFiles(event.target.files); event.currentTarget.value = ""; }} /></label><button className="primary-button" onClick={() => void createNovel()} disabled={saving}>＋ New novel</button></div>
           </header>
 
+          <nav className="library-filter-bar" aria-label="Library filters">
+            {["all", "manual", "epub", "pdf", "gallery"].map((value) => <button key={value} className={category === value ? "active" : ""} onClick={() => setCategory(value)}>{value === "all" ? "All" : value === "manual" ? "My novels" : value.toUpperCase() + (value === "gallery" ? "" : "s")}</button>)}
+            <button className={showFavorites ? "active" : ""} onClick={() => setShowFavorites((value) => !value)} aria-pressed={showFavorites}>★ Favorites</button>
+            <label className="filter-select">Sort by<select value={sortMode} onChange={(event) => setSortMode(event.target.value)}><option value="recent">Recently updated</option><option value="title">Title A–Z</option><option value="rating-desc">Rating: high to low</option><option value="rating-asc">Rating: low to high</option><option value="characters-desc">Characters: most first</option><option value="characters-asc">Characters: fewest first</option></select></label>
+            <label className="filter-select">Tag<select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}><option value="all">All tags</option>{[...new Set(records.flatMap((book) => book.tags ?? []))].sort().map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select></label>
+          </nav>
+
           <section className="library-toolbar" aria-label="Library tools">
             <label className="search-field"><span aria-hidden="true">⌕</span>
               <input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Search books, authors and chapters…" />
@@ -482,14 +501,23 @@ export function LibraryScreen() {
                   <span className="book-card-body">
                     <strong>{book.title || "Untitled book"}</strong>
                     <span>{book.author || "Unknown author"}</span>
-                    <span className="book-card-meta">{book.chapters?.length ?? 0} chapters · {displayDate(book.updated)}</span>
+                    <span className="book-card-meta">{book.chapters?.length ?? 0} chapters · {displayDate(book.updated)}</span>\n                    <span className="book-card-tags">{(book.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</span>
                   </span>
-                  {book.locked && <span className="lock-indicator" aria-label="Locked">● Locked</span>}
+                  {book.locked && <span className="lock-indicator" aria-label="Locked">● Locked</span>}\n                  <span className="book-card-flags">{book["favorite"] ? "★" : ""}{book["pinned"] ? " 📌" : ""}</span>
                 </button>
               ))}
             </section>
           )}
 
+          {activeBook && (
+            <div className="book-quick-actions">
+              <button className="quiet-button" onClick={() => { const updated = { ...activeBook, pinned: !activeBook["pinned"], updated: Date.now() }; void persistBook(updated); }}>{activeBook["pinned"] ? "Unpin from top" : "📌 Pin book"}</button>
+              <button className="quiet-button" onClick={() => { const updated = { ...activeBook, favorite: !activeBook["favorite"], updated: Date.now() }; void persistBook(updated); }}>{activeBook["favorite"] ? "★ Remove favorite" : "☆ Add favorite"}</button>
+              <button className="quiet-button" onClick={() => { const title = window.prompt("Book title", activeBook.title ?? ""); if (title === null) return; const author = window.prompt("Author", activeBook.author ?? ""); if (author === null) return; const rating = window.prompt("Rating (0–5)", String(activeBook.rating ?? 0)); if (rating === null) return; const tags = window.prompt("Tags separated by commas", (activeBook.tags ?? []).join(", ")); if (tags === null) return; void persistBook({ ...activeBook, title: title.trim() || "Untitled book", author: author.trim(), rating: Math.max(0, Math.min(5, Number(rating) || 0)), tags: [...new Set(tags.split(",").map((tag) => tag.trim()).filter(Boolean))], updated: Date.now() }); }}>Edit metadata</button>
+              <button className="quiet-button" onClick={() => { const notes = window.prompt("Book notes", activeBook.notes ?? ""); if (notes !== null) void persistBook({ ...activeBook, notes, updated: Date.now() }); }}>Book notes</button>
+              <button className="quiet-button" onClick={() => { const cover = window.prompt("Paste a cover image data URL (leave blank to clear)", activeBook.cover ?? ""); if (cover !== null) void persistBook({ ...activeBook, cover: cover || undefined, updated: Date.now() }); }}>Set cover</button>
+            </div>
+          )}
           {activeBook && (
             <section className="book-detail-panel" aria-label="Selected book">
               {editingIndex !== null || isCreatingChapter ? (
