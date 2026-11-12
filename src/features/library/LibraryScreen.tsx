@@ -74,7 +74,7 @@ export function LibraryScreen() {
   const [draftImages, setDraftImages] = useState<ChapterImage[]>([]);
   const [readerIndex, setReaderIndex] = useState<number | null>(null);
   const [fontScale, setFontScale] = useState(1);
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState(false);\n  const [backupBusy, setBackupBusy] = useState(false);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const refresh = useCallback(async () => {
@@ -107,6 +107,34 @@ export function LibraryScreen() {
   async function persistBook(updated: BookRecord) {
     await putLegacyRecord(updated);
     setRecords((current) => current.map((book) => book.id === updated.id ? updated : book));
+  }
+
+  async function createBackup() {
+    setBackupBusy(true); setError(null);
+    try {
+      const deviceName = window.prompt("Name this device for backup history", getBackupDeviceName());
+      if (deviceName === null) return;
+      const result = await exportBackup({ novels: true, marks: true, progress: true, pastes: true, appearance: true }, deviceName);
+      const url = URL.createObjectURL(result.blob);
+      const anchor = document.createElement("a");
+      anchor.href = url; anchor.download = result.filename; anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not create a backup.");
+    } finally { setBackupBusy(false); }
+  }
+
+  async function restoreBackup(file?: File) {
+    if (!file) return;
+    if (!window.confirm("Restore this backup? Existing records with matching IDs will be updated; unrelated local books will be retained. A backup file is recommended before continuing.")) return;
+    setBackupBusy(true); setError(null);
+    try {
+      const result = await restoreBackupFile(file);
+      await refresh();
+      window.alert(`Backup restored and verified. ${result.books} books and ${result.pastes} saved pastes were imported.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not restore this backup.");
+    } finally { setBackupBusy(false); }
   }
 
   async function importTxtFiles(fileList: FileList | File[]) {
@@ -427,7 +455,7 @@ export function LibraryScreen() {
               <h1>Library</h1>
               <p className="library-subtitle">Your books stay in this browser. No account or cloud library required.</p>
             </div>
-            <div className="library-top-actions"><label className="secondary-button import-txt-button">{importing ? "Importing…" : "Import TXT / folder"}<input type="file" accept=".txt,text/plain" multiple hidden disabled={importing} onChange={(event) => { if (event.target.files) void importTxtFiles(event.target.files); event.currentTarget.value = ""; }} /></label><button className="primary-button" onClick={() => void createNovel()} disabled={saving}>＋ New novel</button></div>
+            <div className="library-top-actions"><button className="secondary-button" onClick={() => void createBackup()} disabled={backupBusy}>{backupBusy ? "Working…" : "Export backup"}</button><label className="secondary-button import-txt-button">Restore backup<input type="file" accept=".zip,.json,application/zip,application/json" hidden disabled={backupBusy} onChange={(event) => { void restoreBackup(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label><label className="secondary-button import-txt-button">{importing ? "Importing…" : "Import TXT / folder"}<input type="file" accept=".txt,text/plain" multiple hidden disabled={importing} onChange={(event) => { if (event.target.files) void importTxtFiles(event.target.files); event.currentTarget.value = ""; }} /></label><button className="primary-button" onClick={() => void createNovel()} disabled={saving}>＋ New novel</button></div>
           </header>
 
           <section className="library-toolbar" aria-label="Library tools">
