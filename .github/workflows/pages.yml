@@ -2,7 +2,7 @@ name: Build and deploy Quiet Reader
 
 on:
   push:
-    branches: [main, vite-typescript-port]
+    branches: [main, vite-typescript-port, complete-v3-migration]
   pull_request:
     branches: [main]
   workflow_dispatch:
