@@ -1,27 +1,27 @@
 # Feature parity tracking
 
-Source inventory: [quiet-reader-webapp V2-feature](https://github.com/quiet-reader/quiet-reader-webapp/tree/V2-feature/guide).
+Source inventory: [quiet-reader-webapp V3-feature](https://github.com/quiet-reader/quiet-reader-webapp/tree/V3-feature/guide/FEATURE-INVENTORY.md).
 
-This is a migration tracker, not a claim of implementation. Mark a feature complete only after functional tests and desktop/mobile browser checks pass.
+This tracker distinguishes code present from parity verified in browsers. A passing TypeScript build is not proof of feature parity.
 
-| Area | Required behaviour | Status |
+| Area | Current implementation | Status / remaining |
 |---|---|---|
-| Application shell | Offline-capable local-first app; navigation and responsive desktop/mobile shells; V3 state slices and public feature boundaries | State slices ported; UI shell not migrated |
-| Library | Grid, expanded/compact views, filters, sort, tag colors, search across titles/authors/chapters/text; V3 pin/favorite and virtual collections | Domain service ported; UI not migrated |
-| Book details | Metadata, rating, tags, cover, lock/unlock, notes, history, gallery tab, EPUB export; V3 shared lock policy | Policy contract ported; UI and full enforcement audit not migrated |
-| Chapter editor | Create/edit/delete, image insertion, clipboard preview, TXT single/bulk/folder import, batch rename | Not migrated |
-| Reader | Chapter navigation/index, progress, search, reading format, copy, themes, width and text size | Not migrated |
-| Marks | Bookmarks, text/paragraph highlights, colors, notes, search and management | Not migrated |
-| History | Per-book reading/edit history and searchable universal history with lock/clear workflow | Not migrated |
-| Galleries | Import/paste/folder, grid/compact/slideshow, fullscreen viewer, zoom/pan, notes, locks, reorder, rename, history | Not migrated |
-| Translation | Provider configuration, whole-chapter translation, restore original, copy translation | Not migrated |
-| Image OCR | Local browser OCR, whitespace cleanup, translation, expandable result below image | Not migrated |
-| TTS | System speech and optional Kokoro WebGPU worker; failure isolation | Not migrated |
-| EPUB/PDF | Import/export and preservation of extracted content | Not migrated |
-| Backup | ZIP export, SHA-256 verification, assets, legacy JSON v2/v3, additive transactional restore; V3 fingerprint, device provenance, history and collection metadata | Contracts only; exporter/importer not migrated |
-| Links | Novel-to-novel and chapter-to-chapter relationships and navigation | Not migrated |
-| Offline | Static hosting and service-worker cache/update behaviour | Not migrated |
+| Application shell | Vite + React + TypeScript; local-first IndexedDB adapter; initial responsive library surface | Partial. Full navigation shell, offline install/update lifecycle and desktop/mobile regression remain. |
+| Library | Existing book records load; title/author/chapter search; category filters; sorting; tag filter; favorites; pinning; metadata/notes/cover controls; virtual collection management | Partial. Expanded/compact view, full-text search semantics, tag-color editor, galleries and saved-paste UI remain. |
+| Book details | Metadata, rating, tags, cover, notes, lock/unlock, chapter list and basic chapter actions | Partial. Tabs, full history, novel links, EPUB export, richer editing forms and complete lock-policy audit remain. |
+| Chapter editor | Create/edit/delete, edit-history snapshots, image insertion, single/multiple TXT imports and chapter reorder | Partial. Clipboard image paste/preview, batch rename workflow, image preview and chapter history UI remain. |
+| Reader | Chapter navigation, embedded image display, font scaling, bookmarks, progress persistence, novel-wide text search, copy chapter and section-style layout | Partial. Chapter index, search result highlighting, reading themes/width controls, paragraph selection/highlights, notes and auto-read/TTS remain. |
+| Marks | Basic chapter bookmark persistence | Partial. Text/paragraph highlights, colors, notes, search and management remain. |
+| History | Chapter edit snapshots and basic persisted progress | Partial. Per-book reading/edit history UI and searchable universal history with lock/clear workflow remain. |
+| Galleries | Virtual collection service can reference stable image IDs | Not migrated. Gallery creation, import/paste/folder, grid/compact/slideshow, fullscreen, zoom/pan, notes, locks, reorder, rename and history remain. |
+| Translation | None | Not migrated. Provider configuration, whole-chapter translation, restore original and copy translation remain. |
+| Image OCR | None | Not migrated. Browser OCR, whitespace cleanup, translation and expandable result UI remain. |
+| TTS | None | Not migrated. System speech and optional Kokoro WebGPU worker/failure isolation remain. |
+| EPUB/PDF | EPUB import extracts spine text, metadata, cover and embedded images; PDF import extracts selectable text into a book | Partial. EPUB export, PDF rendering/selection and scanned-PDF OCR remain. |
+| Backup | ZIP export/restore service with SHA-256 manifest/file verification, externalized image assets, device provenance, fingerprint/history, collections/preferences metadata; legacy QuietBookBackup JSON v2/v3 parser; additive atomic IndexedDB writes | Implemented at service/UI layer; not release-verified. ZIP round-trip fixtures, real-browser restore into populated DB, malformed/large archive tests and full user-flow verification remain. |
+| Links | Chapter reorder remaps existing bookmark/progress/reading-history/incoming chapter-link indexes | Partial. Novel/chapter link management and reader navigation remain. |
+| Offline | GitHub Pages build artifact is generated by CI | Not migrated. Service-worker shell/runtime cache and safe update lifecycle remain. |
 
 ## Release blocker
 
-Do not direct users to migrate their only copy of a library until a representative real backup has been restored in a clean browser profile and all data counts, IDs, relationships, images, progress, marks, notes, locks and history have been checked.
+Do not merge/deploy as a replacement or ask users to rely on it as their only library until the full V3 feature inventory is implemented and regression-tested. In particular, verify a representative ZIP backup round-trip in a clean browser profile and restore into a non-empty database; compare record counts, IDs, relationships, images, progress, marks, notes, locks and history. Also run desktop/mobile browser smoke tests and offline/update tests.

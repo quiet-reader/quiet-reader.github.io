@@ -2,7 +2,7 @@ name: Build and deploy Quiet Reader
 
 on:
   push:
-    branches: [main, vite-typescript-port]
+    branches: [main, vite-typescript-port, complete-v3-migration]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -39,7 +39,7 @@ jobs:
         with:
           path: ./dist
   deploy:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/vite-typescript-port') && github.event_name != 'pull_request'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/vite-typescript-port' || github.ref == 'refs/heads/complete-v3-migration') && github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -1,5 +1,6 @@
-import { AppShell } from "@/presentation/shell/AppShell";
+import { LibraryScreen } from "@/features/library/LibraryScreen";
+import "@/features/library/library.css";
 
 export function App() {
-  return <AppShell />;
+  return <LibraryScreen />;
 }
