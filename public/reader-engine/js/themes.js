@@ -1,0 +1,4 @@
+import {$} from './utils.js';
+const palettes={default:['#474747','#3b3b3b','#555','#BABABF','#999','#666'],dark:['#171717','#222','#303030','#eee','#aaa','#444'],sepia:['#F1E4CC','#E7D8BD','#DCC9A9','#594633','#806C54','#C7B593'],light:['#fff','#f2f2f2','#e8e8e8','#292929','#777','#ddd']};
+export function applyTheme(name){const values=palettes[name]||palettes.default;['--bg','--panel','--panel2','--fg','--muted','--line'].forEach((key,i)=>document.documentElement.style.setProperty(key,values[i]));localStorage.setItem('qbtheme',name);if($('readerTheme'))$('readerTheme').value=name}
+export function initTheme(){applyTheme(localStorage.getItem('qbtheme')||'default')}
