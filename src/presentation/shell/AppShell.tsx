@@ -50,6 +50,8 @@ const navigation: { label: string; icon: IconName; group?: string }[] = [
   { label: "Import backup", icon: "upload" },
 ];
 
+const tabs: Array<"Library" | "Galleries" | "Add"> = ["Library", "Galleries", "Add"];
+
 const actions: { label: string; detail: string; icon: IconName; tone: string }[] = [
   { label: "New novel", detail: "Start a new reading project", icon: "book", tone: "action-lilac" },
   { label: "New gallery", detail: "Create a visual collection", icon: "gallery", tone: "action-peach" },
@@ -69,6 +71,8 @@ export function AppShell() {
     setMenuOpen(false);
     setActiveTab(label === "Library" ? "Library" : activeTab);
   };
+
+  const activeIcon: IconName = navigation.find((item) => item.label === activePage)?.icon ?? "sparkle";
 
   return (
     <div className="app-shell">
@@ -153,7 +157,7 @@ export function AppShell() {
           {activeTab === "Galleries" && <section className="library-section tab-placeholder"><div className="section-heading-row"><div><h2>Your galleries</h2><p className="section-subtitle">A home for the images and moments inside your stories.</p></div></div><div className="simple-empty"><span className="empty-icon"><Icon name="gallery" size={24} /></span><h3>No galleries yet</h3><p>Create a gallery to keep visual inspiration together.</p><button className="secondary-button" onClick={() => setActiveTab("Add")}><Icon name="plus" size={16} /> Create a gallery</button></div></section>}
 
           {activeTab === "Add" && <section className="library-section tab-placeholder"><div className="section-heading-row"><div><h2>Bring a story in</h2><p className="section-subtitle">Choose how you'd like to add something to Quiet Reader.</p></div></div><div className="action-grid add-grid">{actions.map((action) => <button key={action.label} type="button" className="action-card"><span className={`action-icon ${action.tone}`}><Icon name={action.icon} size={20} /></span><span className="action-copy"><strong>{action.label}</strong><small>{action.detail}</small></span><span className="action-arrow"><Icon name="chevron" size={16} /></span></button>)}</div></section>}
-        </> : <section className="placeholder-page"><span className="empty-icon"><Icon name={navigation.find((item) => item.label === activePage)?.icon ?? "sparkle"} size={24} /></span><p className="eyebrow">QUIET READER WORKSPACE</p><h1>{activePage}</h1><p>This space is part of the new Quiet Reader experience. Its features will be added in a later step.</p><button className="secondary-button" onClick={() => selectPage("Library")}><Icon name="library" size={16} /> Back to library</button></section>}
+        </> : <section className="placeholder-page"><span className="empty-icon"><Icon name={activeIcon} size={24} /></span><p className="eyebrow">QUIET READER WORKSPACE</p><h1>{activePage}</h1><p>This space is part of the new Quiet Reader experience. Its features will be added in a later step.</p><button className="secondary-button" onClick={() => selectPage("Library")}><Icon name="library" size={16} /> Back to library</button></section>}
         <footer className="app-footer"><span><Icon name="leaf" size={13} /> Made for slower moments.</span><span>QUIET READER <i>·</i> A PERSONAL LIBRARY</span></footer>
       </main>
     </div>
