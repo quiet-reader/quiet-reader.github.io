@@ -21,7 +21,7 @@ export function drawLibrary(){
  const categoryHost=$('customCategoryFilters');if(categoryHost){categoryHost.innerHTML=savedCategories.map(tag=>'<button type="button" data-category-filter="'+esc(tag)+'" class="'+(state.tagFilter===tag?'active':'')+'">'+esc(tag)+'</button>').join('')}
  const query=librarySearchQuery.trim().toLocaleLowerCase();
  const list=state.books.filter(b=>{
-  if(state.filter==='gallery'&&b.source!=='gallery')return false;if(state.filter!=='all'&&state.filter!=='gallery'&&b.source!==state.filter)return false;
+  if(state.filter==='gallery'&&b.source!=='gallery')return false;if(state.filter==='manual'&&!['manual','lnreader'].includes(b.source))return false;if(state.filter!=='all'&&state.filter!=='gallery'&&state.filter!=='manual'&&b.source!==state.filter)return false;
   if(state.tagFilter!=='all'&&!(b.tags||[]).includes(state.tagFilter))return false;
   if(!query)return true;
   if(librarySearchMode==='author')return String(b.author||'').toLocaleLowerCase().includes(query);
