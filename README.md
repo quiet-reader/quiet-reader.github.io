@@ -1,23 +1,29 @@
-# Quiet Reader — Vite + React + TypeScript
+# Quiet Reader — new experience
 
-A local-first migration of the existing Quiet Reader browser application.
+A local-first reading workspace built with React, TypeScript and Vite.
 
-**Status: architecture and application shell only. This is not a complete reader yet.** Do not use this branch as the only copy of your library. The existing app remains the source of truth until the new implementation passes feature-parity and backup-restore tests.
+## Current milestone
 
-## Source baseline
+The redesigned application shell and visual navigation are in place. This milestone is intentionally a UI foundation: buttons, tabs, menus and page placeholders establish the product structure without implementing book, import, persistence or reading workflows.
 
-- Source repository: [quiet-reader-webapp](https://github.com/quiet-reader/quiet-reader-webapp)
-- Source branch: `V3-feature` (includes the V2 history)
-- Pinned source commit: `68fa6a3e50be4793ef6b8897b477a6d52f8ccd62`
-- Architecture and data contracts: source `guide/ARCHITECTURE.md`, `guide/DATA-CONTRACT.md`, `guide/DATA-COMPATIBILITY.md`, `guide/FEATURE-OWNERSHIP.md`, `guide/DEPENDENCY-MAP.md`, `guide/SHARED-POLICIES.md`, `guide/FEATURE-INVENTORY.md`, `guide/FEATURE-CHECKLIST.md`. See [V3-MIGRATION.md](docs/V3-MIGRATION.md) for the V3 additions and port status.
+## Architecture principles
+
+- Feature-oriented modularity with explicit public entry points.
+- Dependency direction: Presentation → Application → Domain; Infrastructure implements application/domain ports.
+- IndexedDB access stays behind a dedicated persistence boundary.
+- Legacy data compatibility is isolated from UI components.
+- No destructive database migration or automatic data reset.
+- Expensive capabilities (EPUB/PDF parsing, OCR, translation and TTS) will be lazy-loaded and isolated.
+- Keep transient interface state separate from persisted library data.
+- Keep browser-only capabilities behind adapters and validate imported data at boundaries.
 
 ## Stack
 
-- Vite + React + strict TypeScript.
-- Static client-side build for GitHub Pages; no required server or account.
-- Existing IndexedDB compatibility adapter; no schema migration on startup.
-- CSS variables and feature-scoped styles; no heavy component framework.
-- Vitest for unit tests; Playwright browser tests will be added for end-to-end parity.
+- React 19
+- TypeScript 5.9
+- Vite 7
+- Existing IndexedDB compatibility adapter (not wired into this UI milestone)
+- Vitest
 
 ## Local development
 
@@ -33,15 +39,6 @@ npm run build
 npm run preview
 ```
 
-## Architecture
+## Data safety
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/MIGRATION.md](docs/MIGRATION.md), and [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
-
-## Non-negotiable release gates
-
-1. Preserve all fields and IDs in existing `quietbook-v2` records.
-2. Keep ZIP backup restore and legacy `QuietBookBackup` JSON v2/v3 import compatible.
-3. Restore additively/upserting by ID; never erase unrelated local records.
-4. Match existing desktop and mobile behaviour before redesigning.
-5. Keep OCR, translation, EPUB/PDF processing, and TTS optional and isolated.
-6. Do not claim runtime parity until tested in real browsers with a representative backup.
+The existing `quietbook-v2` database is not opened, modified, upgraded or deleted by this UI-only milestone. The legacy compatibility adapter and data-contract documentation remain in the repository for subsequent implementation.

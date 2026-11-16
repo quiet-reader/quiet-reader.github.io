@@ -2,7 +2,10 @@ name: Build and deploy Quiet Reader
 
 on:
   push:
-    branches: [main, vite-typescript-port]
+    branches:
+      - main
+      - vite-typescript-port
+      - redesign/quiet-reader-v2
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -13,7 +16,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: quiet-reader-pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -24,6 +27,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
       - name: Typecheck and build
@@ -39,7 +43,7 @@ jobs:
         with:
           path: ./dist
   deploy:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/vite-typescript-port') && github.event_name != 'pull_request'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/vite-typescript-port' || github.ref == 'refs/heads/redesign/quiet-reader-v2') && github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
