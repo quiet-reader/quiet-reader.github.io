@@ -817,3 +817,14 @@ label{color:#9ba8b8}
  .filter-row>button{padding:6px 8px}
  .sort-label{width:100%;margin-top:7px}
 }
+
+.custom-category-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.custom-category-filters button{background:transparent;border:1px solid #2b3646;color:#8c99a9;font-size:10px;padding:5px 9px;border-radius:7px}
+.custom-category-filters button:hover,.custom-category-filters button.active{border-color:#657b52;color:#b9f27c;background:#1b2632}
+.category-create-row{align-items:stretch}
+.category-create-row input{flex:1;min-width:0}
+.category-manager-list{display:flex;flex-direction:column;gap:7px}
+.category-manager-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid #2c3848;border-radius:9px;background:#111923}
+.category-manager-item b{font-size:12px;color:#dfe6ee}
+.category-manager-item button{font-size:10px;padding:5px 8px}
+.category-dot{width:7px;height:7px;border-radius:50%;background:#b9f27c;box-shadow:0 0 10px #b9f27c55}
