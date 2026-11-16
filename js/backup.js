@@ -219,7 +219,8 @@ async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId){
   const inner=[...node.childNodes].map(walk).join('');
   return blockTags.has(tag)?'\\n\\n'+inner+'\\n\\n':inner;
  };
- const rawText=walk(doc.body).split(String.fromCharCode(13)).join('');\n const text=rawText.split(String.fromCharCode(10)).map(line=>line.trim()).join(String.fromCharCode(10)).replaceAll(String.fromCharCode(10).repeat(3),String.fromCharCode(10).repeat(2)).trim();
+ const rawText=walk(doc.body).split(String.fromCharCode(13)).join('');
+ const text=rawText.split(String.fromCharCode(10)).map(line=>line.trim()).join(String.fromCharCode(10)).replaceAll(String.fromCharCode(10).repeat(3),String.fromCharCode(10).repeat(2)).trim();
  return {text,images};
 }
 async function readLNReaderArchive(file){
