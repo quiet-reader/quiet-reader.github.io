@@ -1,6 +1,6 @@
 import {getAll} from './db.js';
 
-const filterNames={all:'All',epub:'EPUBs',manual:'My novels',pdf:'PDFs',gallery:'Galleries'};
+const filterNames={all:'All entries',epub:'EPUB',manhwa:'Manhwa',pdf:'PDF',manual:'Novels',gallery:'Galleries'};
 let updateSequence=0;
 let scheduled=false;
 function matchesSearch(book,query,mode){
@@ -13,8 +13,8 @@ async function updateCounts(){
  const sequence=++updateSequence;
  try{
   const items=await getAll(),books=items.filter(item=>item.kind==='book');
-  const query=String(document.getElementById('librarySearch')?.value||'').trim().toLocaleLowerCase();
-  const mode=document.getElementById('librarySearchMode')?.value||'everything';
+  const query=String(document.getElementById('globalSearchInput')?.value||'').trim().toLocaleLowerCase();
+  const mode='everything';
   const tag=document.getElementById('tagFilter')?.value||'all';
   const matching=books.filter(book=>(tag==='all'||(book.tags||[]).includes(tag))&&matchesSearch(book,query,mode));
   if(sequence!==updateSequence)return;
@@ -37,7 +37,7 @@ function scheduleUpdate(){
 }
 const grid=document.getElementById('bookGrid');
 if(grid)new MutationObserver(scheduleUpdate).observe(grid,{childList:true,subtree:true});
-for(const id of ['librarySearch','librarySearchMode','tagFilter']){
+for(const id of ['globalSearchInput','tagFilter']){
  const control=document.getElementById(id);
  control?.addEventListener('input',scheduleUpdate);
  control?.addEventListener('change',scheduleUpdate);
