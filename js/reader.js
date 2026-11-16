@@ -16,7 +16,7 @@ export function openReader(index){stopAutoRead(false);novelSearchBookId=null;con
 export function drawReader(){const b=state.book,c=b.chapters[state.chapter];if(!c)return;$('readerBookTitle').textContent=b.title;$('chapterKicker').textContent='Chapter '+(state.chapter+1)+' of '+b.chapters.length;$('readingTitle').textContent=c.title||'Chapter '+(state.chapter+1);$('topPrevChapter').disabled=state.chapter===0;$('topNextChapter').disabled=state.chapter===b.chapters.length-1;$('chapterCharacterCount').textContent=(c.text||'').length.toLocaleString()+' characters';$('readingBody').innerHTML=chapterHTML(c);renderChapterFormat(chapterFormat);$('jumpChapter').innerHTML=b.chapters.map((x,i)=>'<option value="'+i+'">'+esc(x.title||'Chapter '+(i+1))+'</option>').join('');$('jumpChapter').value=state.chapter;$('prevChapter').disabled=state.chapter===0;$('nextChapter').disabled=state.chapter===b.chapters.length-1;$('chapterCounter').textContent=(state.chapter+1)+' / '+b.chapters.length;updateBookmarkButton();renderHighlights()}
 export async function saveProgress(){if(!state.book)return;state.book.progress={chapter:state.chapter,offset:readerViewport()?.scrollTop||0};state.book.updated=Date.now();await put(state.book)}
 export async function changeChapter(delta){stopAutoRead();await saveProgress();const next=state.chapter+delta;if(next<0||next>=state.book.chapters.length)return;state.chapter=next;drawReader();readerViewport()?.scrollTo(0,0);void recordReading(state.book,state.chapter,0)}
-export async function jumpChapter(index){stopAutoRead();await saveProgress();state.chapter=Number(index);drawReader();window.scrollTo(0,0);void recordReading(state.book,state.chapter,0)}
+export async function jumpChapter(index){stopAutoRead();await saveProgress();state.chapter=Number(index);drawReader();readerViewport()?.scrollTo(0,0);void recordReading(state.book,state.chapter,0)}
 let novelSearchBookId=null;
 let novelSearchIndex=[];
 let novelSearchMatches=[];
@@ -98,7 +98,7 @@ export async function openNovelSearchResult(chapterIndex,paragraphIndex,offset,q
 }
 
 function updateBookmarkButton(){const button=$('bookmarkBtn');if(!button)return;const saved=(state.book?.bookmarks||[]).some(mark=>mark.chapter===state.chapter);button.classList.toggle('is-bookmarked',saved);button.textContent=saved?'★':'☆';button.setAttribute('aria-pressed',String(saved));button.title=saved?'Remove bookmark from this chapter':'Bookmark this chapter';button.setAttribute('aria-label',button.title)}
-export async function addBookmark(){const b=state.book;if(!b)return;b.bookmarks=b.bookmarks||[];const existing=b.bookmarks.some(mark=>mark.chapter===state.chapter);if(existing){b.bookmarks=b.bookmarks.filter(mark=>mark.chapter!==state.chapter);toast('Bookmark removed')}else{const anchorOffset=(readerViewport()?.scrollTop||0)+(readerViewport()?.clientHeight||window.innerHeight)/2;b.bookmarks.push({id:crypto.randomUUID?.()||String(Date.now()),chapter:state.chapter,offset:window.scrollY,anchorOffset,text:$('readingTitle').textContent,created:Date.now()});toast('Bookmark saved')}await put(b);updateBookmarkButton()}
+export async function addBookmark(){const b=state.book;if(!b)return;b.bookmarks=b.bookmarks||[];const existing=b.bookmarks.some(mark=>mark.chapter===state.chapter);if(existing){b.bookmarks=b.bookmarks.filter(mark=>mark.chapter!==state.chapter);toast('Bookmark removed')}else{const anchorOffset=(readerViewport()?.scrollTop||0)+(readerViewport()?.clientHeight||(readerViewport()?.clientHeight||window.innerHeight))/2;b.bookmarks.push({id:crypto.randomUUID?.()||String(Date.now()),chapter:state.chapter,offset:(readerViewport()?.scrollTop||0),anchorOffset,text:$('readingTitle').textContent,created:Date.now()});toast('Bookmark saved')}await put(b);updateBookmarkButton()}
 let chapterFormat='normal';
 let sectionParts=[];
 function isEnglish(text){
@@ -286,7 +286,7 @@ function highlightAutoReadParagraph(){
  $('readingBody').classList.add('focus-active');
  const current=nodes[autoReadIndex];
  if(current){
-  const top=current.getBoundingClientRect().top+window.scrollY-window.innerHeight*0.34;
+  const top=current.getBoundingClientRect().top+(readerViewport()?.scrollTop||0)-(readerViewport()?.clientHeight||window.innerHeight)*0.34;
   const speed=Number($('autoReadSpeed')?.value||55);
   readerViewport()?.scrollTo({top:Math.max(0,top),behavior:speed>78?'auto':'smooth'});
  }
@@ -396,7 +396,7 @@ async function advanceAutoRead(){
    void recordReading(state.book,state.chapter,0);
    autoReadIndex=0;autoReadCharOffset=0;kokoroSentenceIndex=0;
    drawReader();
-   window.scrollTo({top:0,behavior:'auto'});
+   readerViewport()?.scrollTo({top:0,behavior:'auto'});
   }else{
    stopAutoRead();
    toast('Reached the end of the novel');
