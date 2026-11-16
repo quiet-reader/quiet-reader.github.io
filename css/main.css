@@ -1357,7 +1357,9 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--b
 
 /* Collection details use the same immersive viewport and display density as a novel. */
 #bookGrid.collection-workspace{display:block;grid-template-columns:none}
-body.collection-fullscreen #topbar,body.collection-fullscreen .main-nav-wrap{display:none!important}
+body.collection-fullscreen .topbar,body.collection-fullscreen .main-nav-wrap{display:none!important}
 body.collection-fullscreen #screen-library{position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;margin:0;padding:18px clamp(14px,3vw,42px) 70px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;z-index:60;background:var(--bg)}
 body.collection-fullscreen #screen-library .filter-row,body.collection-fullscreen #screen-library .pastes-section{display:none!important}
 @media(max-width:650px){body.collection-fullscreen #screen-library{padding:12px 11px calc(24px + env(safe-area-inset-bottom))}}
+
+.display-detail-toggle{display:flex;flex-direction:row;align-items:center;gap:9px;margin-top:10px;color:var(--fg)}.display-detail-toggle input{width:16px;height:16px;accent-color:var(--accent)}
