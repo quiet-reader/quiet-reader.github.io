@@ -97,7 +97,7 @@ export function drawLibrary(){
  $('bookGrid')?.classList.toggle('collection-workspace',state.filter==='collections');
  const entryDefaults=[['all','All entries'],['epub','EPUB'],['manhwa','Manhwa'],['pdf','PDF'],['manual','Novels'],['gallery','Galleries']];
  let entryConfig={};try{entryConfig=JSON.parse(localStorage.getItem('qrLibraryEntryConfig')||'{}')||{}}catch{entryConfig={}}
- document.querySelectorAll('#libraryEntryTabs [data-filter]').forEach(button=>{const key=button.dataset.filter,config=entryConfig[key]||{};button.textContent=config.label||entryDefaults.find(item=>item[0]===key)?.[1]||key;button.classList.toggle('hidden',config.visible===false)});
+ document.querySelectorAll('#libraryEntryTabs [data-filter]').forEach(button=>{const key=button.dataset.filter,config=entryConfig[key]||{},label=config.label||entryDefaults.find(item=>item[0]===key)?.[1]||key;let textNode=[...button.childNodes].find(node=>node.nodeType===Node.TEXT_NODE);if(textNode)textNode.nodeValue=label;else button.insertBefore(document.createTextNode(label),button.querySelector('.filter-count')||button.firstChild);button.classList.toggle('hidden',config.visible===false)});
  const savedCategories=(()=>{try{const value=JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]');return Array.isArray(value)?value.filter(x=>typeof x==='string'&&x.trim()):[]}catch{return []}})();
  const availableTags=[...new Set([...state.books.flatMap(b=>Array.isArray(b.tags)?b.tags:[]).map(t=>String(t).trim()).filter(Boolean),...savedCategories])].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
  const tagSelect=$('tagFilter');
