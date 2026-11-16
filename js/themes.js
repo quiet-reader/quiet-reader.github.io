@@ -32,7 +32,7 @@ export function applyTheme(name){
  document.documentElement.style.colorScheme=name==='sepia'||name==='light'?'light':'dark';
  localStorage.setItem('qbtheme',name);
  if($('readerTheme'))$('readerTheme').value=name;
- const accent=localStorage.getItem('qrAccent');if(accent)applyAccent(accent);
+ const accent=localStorage.getItem('qrAccent');if(accent)applyAccent(accent);else setFavicon(palette.accent);
  const background=localStorage.getItem('qrBackground');if(background)applyBackground(background);
 }
 export function initTheme(){applyTheme(localStorage.getItem('qbtheme')||'default')}
