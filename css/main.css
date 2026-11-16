@@ -980,7 +980,7 @@ body{
 .reading-body{font-family:'DM Sans',sans-serif;font-size:19px;line-height:1.95;color:#d7e0e7}
 .reading-body p{margin:0 0 1.35em}
 .reader-panel{left:auto!important;right:0!important;z-index:92!important;width:min(380px,92vw);background:#151e29;border-left:1px solid #354253;box-shadow:-18px 0 48px #0007}
-.drawer{left:auto!important;right:0!important;transform:translateX(105%);width:min(360px,92vw);background:#151e29;border-left:1px solid #354253;box-shadow:-18px 0 48px #0007}
+.drawer{left:auto!important;right:0!important;z-index:92!important;transform:translateX(105%);width:min(360px,92vw);background:#151e29;border-left:1px solid #354253;box-shadow:-18px 0 48px #0007}
 .drawer.open{transform:translateX(0)}
 .drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .drawer-head>div{display:flex;flex-direction:column;gap:3px}
