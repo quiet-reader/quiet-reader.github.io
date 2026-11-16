@@ -1,7 +1,7 @@
 import {state,freshBook} from './state.js';
 import {put} from './db.js';
 import {$,esc,toast,modal,closeModal,dataURL,uid} from './utils.js';
-import {refresh,openBook,setBookTab,drawBook} from './library.js';import {addEditEvent} from './history.js';import {confirmImagePreview} from './image-preview.js';
+import {refresh,openBook,setBookTab,drawBook,addToCollection} from './library.js';import {addEditEvent} from './history.js';import {confirmImagePreview} from './image-preview.js';
 import {openImageTranslation,renderImageTranslationOverlay,clearImageTranslationOverlay} from './image-translation.js';
 
 let sliderIndex=0;
@@ -207,17 +207,19 @@ function bulkRenameImages(book,images){
   $('applyGalleryBulkRename').onclick=async()=>{const prefix=$('galleryRenamePrefix').value.trim()||'Image_',start=Math.max(0,Number($('galleryRenameStart').value)||0),digits=Math.max(1,Math.min(8,Number($('galleryRenameDigits').value)||1));let number=0;for(const image of selected){const dot=image.name.lastIndexOf('.'),ext=dot>0?image.name.slice(dot):'';image.name=prefix+String(start+number++).padStart(digits,'0')+ext}addEditEvent(book,'Images bulk renamed',selected.length+' images');await persist(book);selectedImageIds.clear();closeModal();renderGallery();drawBook();toast(selected.length+' images renamed')};
  });
 }
+export async function openGalleryImageById(id){const index=(state.book?.gallery?.images||[]).findIndex(image=>image.id===id);if(index>=0)await openImage(index)}
 export function renderGallery(){
  const book=state.book,host=$('galleryContent');if(!host||!book)return;
  const gallery=ensureGallery(book),images=gallery.images,view=['slider','compact'].includes(gallery.view)?gallery.view:'grid';
- const sizes=bookStorage(book);
- host.innerHTML='<div class="gallery-overview tiny muted">Gallery added '+esc(dateTime(gallery.createdAt))+' · Last opened '+esc(dateTime(gallery.lastOpenedAt))+'<br>Gallery images '+formatBytes(sizes.gallery)+' · Chapter images '+formatBytes(sizes.chapterImages)+' · Chapter text '+formatBytes(sizes.chapterText)+' · <b>Total '+formatBytes(sizes.total)+'</b></div><div class="gallery-toolbar"><div class="row wrap"><button type="button" data-gallery-view="grid" class="'+(view==='grid'?'active':'')+'">▦ Grid</button><button type="button" data-gallery-view="compact" class="'+(view==='compact'?'active':'')+'">☷ Compact</button><button type="button" data-gallery-view="slider" class="'+(view==='slider'?'active':'')+'">▣ Slideshow</button><span class="muted tiny">'+images.length+' images · '+formatBytes(sizes.gallery)+'</span><button type="button" data-gallery-history>◷ History</button><span class="grow"></span><button type="button" data-gallery-add '+(book.locked?'disabled':'')+'>＋ Add images</button><button type="button" data-gallery-folder '+(book.locked?'disabled':'')+'>＋ Add folder</button><button type="button" data-gallery-paste '+(book.locked?'disabled':'')+'>Paste image</button></div></div><div class="gallery-lock-note">'+(book.locked?'🔒 This gallery is locked. Unlock editing to change images or notes.':'Gallery unlocked · locked images cannot be renamed or reordered')+'</div>';
+ const sizes=bookStorage(book),collapsed=localStorage.getItem('qrBookDetailCollapsed')==='1';
+ host.innerHTML='<div class="gallery-overview tiny muted '+(collapsed?'hidden':'')+'">Gallery added '+esc(dateTime(gallery.createdAt))+' · Last opened '+esc(dateTime(gallery.lastOpenedAt))+'<br>Gallery images '+formatBytes(sizes.gallery)+' · Chapter images '+formatBytes(sizes.chapterImages)+' · Chapter text '+formatBytes(sizes.chapterText)+' · <b>Total '+formatBytes(sizes.total)+'</b></div><div class="gallery-toolbar"><div class="row wrap"><button type="button" data-gallery-view="grid" class="'+(view==='grid'?'active':'')+'">▦ Grid</button><button type="button" data-gallery-view="compact" class="'+(view==='compact'?'active':'')+'">☷ Compact</button><button type="button" data-gallery-view="slider" class="'+(view==='slider'?'active':'')+'">▣ Slideshow</button><span class="muted tiny">'+images.length+' images · '+formatBytes(sizes.gallery)+'</span><button type="button" data-gallery-history>◷ History</button><span class="grow"></span><button type="button" data-gallery-add '+(book.locked?'disabled':'')+'>＋ Add images</button><button type="button" data-gallery-folder '+(book.locked?'disabled':'')+'>＋ Add folder</button><button type="button" data-gallery-paste '+(book.locked?'disabled':'')+'>Paste image</button></div></div><div class="gallery-lock-note">'+(book.locked?'🔒 This gallery is locked. Unlock editing to change images or notes.':'Gallery unlocked · locked images cannot be renamed or reordered')+'</div>';
  host.onclick=async event=>{
   const viewButton=event.target.closest('[data-gallery-view]');if(viewButton){gallery.view=viewButton.dataset.galleryView;await persist(book);renderGallery();return}
   if(event.target.closest('[data-gallery-add]')){addGalleryImages();return}
   if(event.target.closest('[data-gallery-folder]')){addGalleryFolder();return}
   if(event.target.closest('[data-gallery-paste]')){await pasteGalleryImages();return}
   if(event.target.closest('[data-gallery-history]')){showGalleryHistory();return}
+  const collectImage=event.target.closest('[data-add-gallery-image-to-collection]');if(collectImage){await addToCollection('image',book,Number(collectImage.dataset.imageIndex));return}
   if(event.target.closest('[data-gallery-select-all]')){const unlocked=images.filter(image=>!image.locked);if(selectedImageIds.size===unlocked.length)selectedImageIds.clear();else unlocked.forEach(image=>selectedImageIds.add(image.id));renderGallery();return}
   if(event.target.closest('[data-gallery-clear-selection]')){selectedImageIds.clear();renderGallery();return}
   if(event.target.closest('[data-gallery-bulk-rename]')){bulkRenameImages(book,images);return}
