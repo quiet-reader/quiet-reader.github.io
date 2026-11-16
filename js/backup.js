@@ -191,7 +191,7 @@ function guessMime(name){
  return ({jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',avif:'image/avif',svg:'image/svg+xml',bmp:'image/bmp',epub:'application/epub+zip',pdf:'application/pdf',txt:'text/plain'})[ext]||'application/octet-stream';
 }
 function safeId(){return uid()}
-function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId){
+async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId){
  const doc=new DOMParser().parseFromString(html,'text/html');
  doc.querySelectorAll('script,style,nav,header,footer').forEach(node=>node.remove());
  const images=[];
