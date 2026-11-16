@@ -1319,4 +1319,38 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--b
 .appearance-color-field input[type=color]{width:52px;height:34px;padding:3px;border-radius:8px}
 @media(max-width:520px){.appearance-options{grid-template-columns:1fr}#screen-book .book-detail-actions.action-strip{gap:4px}#screen-book .book-detail-actions.action-strip button{height:33px}.chapter-toolbar{gap:5px}.chapter-toolbar-actions{grid-auto-columns:minmax(30px,1fr);gap:3px}.chapter-toolbar-actions button{height:33px}}
 
-#screen-library{position:relative;z-index:95}#libraryEntryTabs{z-index:96}
+#screen-library{position:relative;z-index:95}#libraryEntryTabs{z-index:4}
+/* Keep global overlays above every screen-level stacking context. */
+.scrim{position:fixed;inset:0;z-index:210!important}
+.drawer,.reader-panel{z-index:220!important}
+.modal-back{z-index:250!important}
+.modal{z-index:251!important}
+#screen-library{isolation:isolate}
+.add-menu-trigger{display:grid!important;place-items:center!important;text-align:center!important;line-height:1!important;padding:0!important}
+#openGalleryAddMenu,#openCollectionAddMenu{width:38px;height:36px;font-size:23px}
+.collection-create-plus{width:38px;height:36px;padding:0;display:grid;place-items:center;line-height:1;font-size:22px}
+.collection-detail-head{margin:0 0 16px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:13px}
+.collection-detail-title-row,.collection-detail-meta,.collection-view-controls{display:flex;align-items:center;gap:10px}
+.collection-detail-meta{margin:12px 0;min-width:0}
+.collection-detail-cover{width:68px;height:68px;flex:0 0 68px;display:grid;place-items:center;border-radius:10px;background:var(--panel2);overflow:hidden;color:var(--accent);font-size:24px}
+.collection-detail-cover img{width:100%;height:100%;object-fit:cover}
+.collection-detail-meta h2{margin:0;color:var(--fg);font:700 19px Manrope,sans-serif}
+.collection-detail-meta p{margin:3px 0;color:var(--muted);font-size:11px}
+.collection-view-controls{flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px}
+.collection-view-controls button{font-size:10px;padding:6px 10px}
+.collection-view-controls button.active{color:var(--accent);border-color:var(--accent)}
+.collection-view-controls label{display:flex;flex-direction:row;align-items:center;margin-left:auto}
+.collection-view-controls select{width:auto;padding:5px 8px;font-size:10px}
+.collection-index-grid,.collection-items-grid{margin-top:12px}
+.collection-image-preview{display:block;max-width:100%;max-height:75vh;object-fit:contain;margin:auto}
+.collection-detail-title-row button{min-width:34px}
+.book-detail{position:relative}
+.book-detail-collapse-toggle{position:absolute;right:12px;top:12px;width:30px;height:30px;padding:0;display:grid;place-items:center;z-index:2}
+.book-detail.detail-collapsed{align-items:center;gap:12px;padding:10px 48px 10px 12px;min-height:54px}
+.book-detail.detail-collapsed .detail-cover,.book-detail.detail-collapsed .novel-stats,.book-detail.detail-collapsed .detail-tags,.book-detail.detail-collapsed .book-detail-actions{display:none!important}
+.book-detail.detail-collapsed .grow{display:flex;align-items:center;gap:12px;min-width:0}
+.book-detail.detail-collapsed h1{font-size:16px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book-detail.detail-collapsed .detail-author{margin:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gallery-image-collection-action{padding:0 10px 6px}
+.gallery-image-collection-action button{font-size:10px;padding:5px 8px}
+@media(max-width:650px){.collection-detail-meta h2{font-size:16px}.collection-view-controls label{margin-left:0}.collection-index-grid,.collection-items-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.collection-items-grid.compact-view{grid-template-columns:1fr}.collection-items-grid.compact-view .book-card{grid-template-columns:64px minmax(0,1fr)}.collection-items-grid.compact-view .book-cover{height:82px;min-height:82px}.book-detail.detail-collapsed{padding-right:44px}.book-detail.detail-collapsed .grow{flex-direction:column;align-items:flex-start;gap:1px}.book-detail.detail-collapsed h1{max-width:100%}}
