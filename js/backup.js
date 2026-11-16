@@ -354,7 +354,9 @@ export async function importZipCollection(file,mode='library'){
  for(const entry of pdfs){const blob=await entry.async('blob');await importPDF(new File([blob],entry.name.split('/').pop(),{type:'application/pdf'}))}
  if(txts.length){
   const paths=txts.map(entry=>({entry,parts:entry.name.split('/').filter(Boolean)}));
-  const commonRoot=paths.length&&paths.every(item=>item.parts.length>1&&item.parts[0]===paths[0].parts[0])?paths[0].parts[0]:null;
+  const sharedFirst=paths.length&&paths.every(item=>item.parts.length>1&&item.parts[0]===paths[0].parts[0])?paths[0].parts[0]:null;
+  const secondFolders=new Set(paths.map(item=>item.parts[1]).filter(Boolean));
+  const commonRoot=sharedFirst&&paths.every(item=>item.parts.length>2)&&(['books','novels','library','backup','export','archive'].includes(sharedFirst.toLowerCase())||secondFolders.size>1)?sharedFirst:null;
   const groups=new Map();
   for(const item of paths){
    const relative=commonRoot?item.parts.slice(1):item.parts;
