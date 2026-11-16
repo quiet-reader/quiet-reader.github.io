@@ -257,7 +257,7 @@ async function readLNReaderArchive(file){
    if(cover){const bytes=await cover.async('uint8array');book.cover='data:image/png;base64,'+bytesToBase64(bytes)}
   }
   const readChapters=novel.chapters.map((chapter,index)=>({chapter,index})).sort((a,b)=>(Number(a.chapter.position??a.index)-Number(b.chapter.position??b.index)));
-  let lastReadIndex=-1,lastReadAt=0;
+  let lastReadIndex=-1,lastReadAt=0;book.readingHistory=[];
   for(const {chapter,index} of readChapters){
    let text='',images=[];
    if(novelFiles&&chapter.isDownloaded){
@@ -268,6 +268,7 @@ async function readLNReaderArchive(file){
    const now=Date.now();
    const readAt=chapter.readTime?new Date(chapter.readTime).getTime():0;
    if(readAt>lastReadAt){lastReadAt=readAt;lastReadIndex=chapterIndex}
+   if(chapter.readTime)book.readingHistory.push({chapter:chapterIndex,readAt:chapter.readTime});
    book.chapters.push({
     title:String(chapter.name||'Chapter '+(index+1)),text,images,
     createdAt:chapter.releaseTime?new Date(chapter.releaseTime).getTime()||now:now,
@@ -277,7 +278,7 @@ async function readLNReaderArchive(file){
    if(chapter.bookmark)book.bookmarks.push({id:safeId(),chapter:chapterIndex,offset:0,text:String(chapter.name||'Chapter '+(index+1)),created:now});
   }
   book.progress={chapter:Math.max(0,lastReadIndex),offset:0};
-  book.readingHistory=readChapters.filter(({chapter})=>chapter.readTime).map(({chapter,index})=>({chapter:index,readAt:chapter.readTime})).slice(-100);
+  book.readingHistory=book.readingHistory.slice(-100);
   book.updated=Date.now();
   items.push(book);
  }
