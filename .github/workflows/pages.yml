@@ -6,6 +6,7 @@ on:
       - main
       - vite-typescript-port
       - redesign/quiet-reader-v2
+      - redesign/gateprep-visual-language
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -42,7 +43,7 @@ jobs:
         with:
           path: ./dist
   deploy:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/vite-typescript-port' || github.ref == 'refs/heads/redesign/quiet-reader-v2') && github.event_name != 'pull_request'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/vite-typescript-port' || github.ref == 'refs/heads/redesign/quiet-reader-v2' || github.ref == 'refs/heads/redesign/gateprep-visual-language') && github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
