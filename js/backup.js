@@ -367,10 +367,16 @@ function applyPreferences(data){
 export async function importBackup(file){
  try{
   let restored;
-  if(/\.zip$/i.test(file.name)||file.type==='application/zip'||file.type==='application/x-zip-compressed')restored=await readZipArchive(file);
-  else restored=parseLegacyBackup(JSON.parse(await file.text()));
+  if(/\\.zip$/i.test(file.name)||file.type==='application/zip'||file.type==='application/x-zip-compressed'){
+   const archive=await JSZip.loadAsync(file);
+   if(archive.file('manifest.json'))restored=await readZipArchive(file);
+   else restored=await readLNReaderArchive(file);
+  }else{
+   const parsed=JSON.parse(await file.text());
+   try{restored=parseLegacyBackup(parsed)}catch{restored=parseLNReaderJson(parsed)}
+  }
   if(!Array.isArray(restored.items)||restored.items.some(item=>!item||!item.id||!['book','paste'].includes(item.kind)))throw new Error('The backup contains an invalid book or paste record.');
-  // Validate the entire archive before writing anything; one IndexedDB transaction commits all records.
+  // Validate the complete restore before writing; putMany commits all entries together.
   await putMany(restored.items);
   applyPreferences(restored);
   toast('Backup restored · '+restored.items.length+' entries imported');
