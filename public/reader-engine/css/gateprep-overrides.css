@@ -1,5 +1,6 @@
 /* Quiet Reader · GATEPrep visual language */
 :root{--bg:#10141d;--panel:#171d29;--panel2:#1e2735;--fg:#e8edf4;--muted:#8e9aab;--line:#2b3545;--accent:#b9f27c;--auto-read-highlight:#b9f27c}
+.topbar{display:none}
 body{background:var(--bg);color:var(--fg);font-family:Manrope,"DM Sans",system-ui,sans-serif}
 button,input,textarea,select{font-family:inherit}
 button{background:#171d29;border-color:#2b3545;color:#dfe7f1;transition:background .18s,border-color .18s,transform .18s,box-shadow .18s}
