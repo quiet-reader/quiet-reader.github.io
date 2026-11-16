@@ -271,7 +271,7 @@ async function readLNReaderArchive(file){
    const cover=findZipEntry(dataZip,name=>coverNames.some(value=>value&&name.toLowerCase().endsWith('/covers/'+value.toLowerCase())||value&&name.toLowerCase().endsWith('/'+value.toLowerCase())))||
     (novelFiles&&findZipEntry(novelFiles,name=>name.toLowerCase().includes('/'+pluginId.toLowerCase()+'/'+id.toLowerCase()+'/')&&/(^|\/)cover\.(png|jpe?g|webp)$/i.test(name)))||
     findZipEntry(outer,name=>/(^|\/)cover\.(png|jpe?g|webp)$/i.test(name)&&name.toLowerCase().includes(String(id).toLowerCase()));
-   if(cover){const bytes=await cover.async('uint8array'),mime=guessMime(cover.name);book.cover='data:'+mime+';base64,'+bytesToBase64(bytes)}
+   if(cover){const bytes=await cover.async('uint8array'),mime=/\.(jpe?g|png|webp|gif|avif)$/i.test(cover.name)?guessMime(cover.name):'image/png';book.cover='data:'+mime+';base64,'+bytesToBase64(bytes)}
   }
   const readChapters=novel.chapters.map((chapter,index)=>({chapter,index})).sort((a,b)=>(Number(a.chapter.position??a.index)-Number(b.chapter.position??b.index)));
   let lastReadIndex=-1,lastReadAt=0;book.readingHistory=[];
