@@ -1354,3 +1354,10 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--b
 .gallery-image-collection-action{padding:0 10px 6px}
 .gallery-image-collection-action button{font-size:10px;padding:5px 8px}
 @media(max-width:650px){.collection-detail-meta h2{font-size:16px}.collection-view-controls label{margin-left:0}.collection-index-grid,.collection-items-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.collection-items-grid.compact-view{grid-template-columns:1fr}.collection-items-grid.compact-view .book-card{grid-template-columns:64px minmax(0,1fr)}.collection-items-grid.compact-view .book-cover{height:82px;min-height:82px}.book-detail.detail-collapsed{padding-right:44px}.book-detail.detail-collapsed .grow{flex-direction:column;align-items:flex-start;gap:1px}.book-detail.detail-collapsed h1{max-width:100%}}
+
+/* Collection details use the same immersive viewport and display density as a novel. */
+#bookGrid.collection-workspace{display:block;grid-template-columns:none}
+body.collection-fullscreen #topbar,body.collection-fullscreen .main-nav-wrap{display:none!important}
+body.collection-fullscreen #screen-library{position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;margin:0;padding:18px clamp(14px,3vw,42px) 70px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;z-index:60;background:var(--bg)}
+body.collection-fullscreen #screen-library .filter-row,body.collection-fullscreen #screen-library .pastes-section{display:none!important}
+@media(max-width:650px){body.collection-fullscreen #screen-library{padding:12px 11px calc(24px + env(safe-area-inset-bottom))}}
