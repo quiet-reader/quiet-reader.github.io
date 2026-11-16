@@ -351,8 +351,19 @@ export async function importZipCollection(file,mode='library'){
  for(const entry of epubs){const blob=await entry.async('blob');await importEPUB(new File([blob],entry.name.split('/').pop(),{type:'application/epub+zip'}))}
  for(const entry of pdfs){const blob=await entry.async('blob');await importPDF(new File([blob],entry.name.split('/').pop(),{type:'application/pdf'}))}
  if(txts.length){
-  const wrapped=await Promise.all(txts.map(async entry=>({name:entry.name.split('/').pop(),webkitRelativePath:entry.name,text:()=>entry.async('string')})));
-  await importTextBook(wrapped);
+  const paths=txts.map(entry=>({entry,parts:entry.name.split('/').filter(Boolean)}));
+  const commonRoot=paths.length&&paths.every(item=>item.parts.length>1&&item.parts[0]===paths[0].parts[0])?paths[0].parts[0]:null;
+  const groups=new Map();
+  for(const item of paths){
+   const relative=commonRoot?item.parts.slice(1):item.parts;
+   const key=relative.length>1?relative[0]:'__root__';
+   if(!groups.has(key))groups.set(key,[]);
+   groups.get(key).push({entry:item.entry,relative:relative.join('/')});
+  }
+  for(const group of groups.values()){
+   const wrapped=await Promise.all(group.map(async item=>({name:item.relative.split('/').pop(),webkitRelativePath:item.relative,text:()=>item.entry.async('string')})));
+   await importTextBook(wrapped);
+  }
  }
  if(epubs.length||pdfs.length||txts.length)toast('ZIP import complete · '+(epubs.length+pdfs.length+txts.length)+' book files');
 }
