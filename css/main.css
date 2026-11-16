@@ -1277,3 +1277,5 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--b
 }
 
 .card-lock svg,#lockLabel svg,#lockBook svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}.card-lock{display:inline-flex;align-items:center;color:var(--muted)}#lockBook{display:inline-flex;align-items:center;gap:7px}
+
+.card-favorite-action{color:#f0d34f!important}.card-favorite-action.active svg{fill:#f0d34f}
