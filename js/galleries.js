@@ -16,7 +16,7 @@ function ensureGallery(book){
  return book.gallery;
 }
 async function persist(book){book.updated=Date.now();await put(book);const index=state.books.findIndex(item=>item.id===book.id);if(index>=0)state.books[index]=book}
-export function createGallery(){
+export function createGallery(pickerMode=''){
  let selectedFiles=[];
  const body='<div class="stack"><label>Gallery title<input id="newGalleryTitle" placeholder="Gallery title"></label><label>Author / source (optional)<input id="newGalleryAuthor"></label><label>Tags (comma-separated)<input id="newGalleryTags" placeholder="art, reference, characters"></label><p class="muted tiny">Choose images or a folder. GIFs remain animated. You can also create an empty gallery and add images later.</p><div class="row wrap"><button type="button" id="selectGalleryImages">Choose images</button><button type="button" id="selectGalleryFolder">Choose folder</button><span id="gallerySelectionCount" class="tiny muted">No images selected</span></div><input id="newGalleryImageFiles" type="file" accept="image/*" multiple hidden><input id="newGalleryFolderFiles" type="file" accept="image/*" webkitdirectory directory multiple hidden><button id="createGalleryNow" class="primary">Create gallery</button></div>';
  modal('Create an image gallery',body,()=>{
@@ -25,6 +25,8 @@ export function createGallery(){
   const updateSelection=files=>{selectedFiles=imageFiles(files);$('gallerySelectionCount').textContent=selectedFiles.length+' image'+(selectedFiles.length===1?'':'s')+' selected'};
   $('newGalleryImageFiles').onchange=e=>updateSelection(e.target.files);
   $('newGalleryFolderFiles').onchange=e=>updateSelection(e.target.files);
+  if(pickerMode==='images')$('selectGalleryImages').click();
+  if(pickerMode==='folder')$('selectGalleryFolder').click();
   $('createGalleryNow').onclick=async()=>{
    const book=freshBook('gallery',$('newGalleryTitle').value.trim()||'Untitled gallery');
    book.author=$('newGalleryAuthor').value.trim();
