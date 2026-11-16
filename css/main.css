@@ -1363,3 +1363,7 @@ body.collection-fullscreen #screen-library .filter-row,body.collection-fullscree
 @media(max-width:650px){body.collection-fullscreen #screen-library{padding:12px 11px calc(24px + env(safe-area-inset-bottom))}}
 
 .display-detail-toggle{display:flex;flex-direction:row;align-items:center;gap:9px;margin-top:10px;color:var(--fg)}.display-detail-toggle input{width:16px;height:16px;accent-color:var(--accent)}
+
+body.detail-header-hidden .book-detail{display:none!important}
+
+.collection-items-grid>.empty-state{grid-column:1/-1}
