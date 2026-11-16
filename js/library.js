@@ -53,8 +53,8 @@ export function drawLibrary(){
  const categoryHost=$('customCategoryFilters');if(categoryHost){categoryHost.innerHTML=savedCategories.map(tag=>'<button type="button" data-category-filter="'+esc(tag)+'" class="'+(state.tagFilter===tag?'active':'')+'">'+esc(tag)+'</button>').join('')}
  const query=librarySearchQuery.trim().toLocaleLowerCase();
  const stamp=value=>typeof value==='number'?value:(Date.parse(value)||Number(value)||0);
- if(state.filter==='collections'){drawCollections($('bookGrid'));$('pasteList').innerHTML='';$('pastesSection')?.classList.add('hidden');return}
- $('pastesSection')?.classList.remove('hidden');
+ if(state.filter==='collections'){document.querySelector('.filter-row')?.classList.add('hidden');drawCollections($('bookGrid'));$('pasteList').innerHTML='';$('pastesSection')?.classList.add('hidden');return}
+ document.querySelector('.filter-row')?.classList.remove('hidden');$('pastesSection')?.classList.remove('hidden');
  const authorMatches=query?state.books.filter(b=>String(b.author||'').toLocaleLowerCase().includes(query)):[];
  const preferAuthor=authorMatches.length>0;
  const list=state.books.filter(b=>{
