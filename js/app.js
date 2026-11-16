@@ -131,3 +131,15 @@ function manageLibraryCategories(){
  });
 }
 $('manageCategories')?.addEventListener('click',manageLibraryCategories);
+
+document.querySelectorAll('[data-filter]').forEach(button=>{
+ button.addEventListener('click',()=>{
+  const gallery=button.dataset.filter==='gallery';
+  document.querySelectorAll('[data-main-section]').forEach(nav=>nav.classList.toggle('active',nav.dataset.mainSection===(gallery?'gallery':'library')));
+ });
+});
+document.querySelectorAll('[data-category-filter]').forEach(button=>{
+ button.addEventListener('click',()=>{
+  document.querySelectorAll('[data-main-section]').forEach(nav=>nav.classList.toggle('active',nav.dataset.mainSection==='library'));
+ });
+});
