@@ -1,7 +1,7 @@
 import {getAll,putMany,put} from './db.js';
 import {freshBook,state} from './state.js';
 import {refresh,openBook} from './library.js';
-import {renderGallery} from './galleries.js';
+import {renderGallery,importGalleryFiles} from './galleries.js';
 import {importEPUB} from './epub.js';
 import {importPDF} from './pdf.js';
 import {importTextBook} from './editor.js';
@@ -271,7 +271,7 @@ async function readLNReaderArchive(file){
     updatedAt:chapter.updatedTime?new Date(chapter.updatedTime).getTime()||now:now,
     lnReader:{id:chapter.id,path:chapter.path||'',chapterNumber:chapter.chapterNumber??index+1,page:chapter.page??'1',scanlator:chapter.scanlator||'',read:chapter.unread===false,downloaded:Boolean(chapter.isDownloaded),progress:Number(chapter.progress)||0,timeSpent:Number(chapter.timeSpent)||0}
    });
-   if(chapter.bookmark)book.bookmarks.push({id:safeId(),chapter:index,offset:0,text:String(chapter.name||'Chapter '+(index+1)),created:now});
+   if(chapter.bookmark)book.bookmarks.push({id:safeId(),chapter:chapterIndex,offset:0,text:String(chapter.name||'Chapter '+(index+1)),created:now});
   }
   book.progress={chapter:Math.max(0,lastReadIndex),offset:0};
   book.readingHistory=readChapters.filter(({chapter})=>chapter.readTime).map(({chapter,index})=>({chapter:index,readAt:chapter.readTime})).slice(-100);
@@ -327,7 +327,15 @@ export async function importZipCollection(file,mode='library'){
  const files=zipFiles(archive);
  if(archive.file('manifest.json')||findZipEntry(archive,name=>/^(?:.*\\/)?data\\.zip$/i.test(name)))return importBackup(file);
  const images=files.filter(entry=>/\\.(png|jpe?g|gif|webp|avif|svg|bmp)$/i.test(entry.name));
- if(mode==='gallery')return createGalleryFromZipEntries(file,images);
+ if(mode==='gallery'){
+  if(state.screen==='book'&&state.book?.source==='gallery'){
+   const selected=[];
+   for(const entry of images){const blob=await entry.async('blob');const name=entry.name.split('/').pop()||'Image';selected.push(new File([blob],name,{type:blob.type||guessMime(name)}))}
+   if(!selected.length)throw new Error('No supported images were found in this ZIP.');
+   return importGalleryFiles(selected);
+  }
+  return createGalleryFromZipEntries(file,images);
+ }
  const epubs=files.filter(entry=>/\\.epub$/i.test(entry.name));
  const pdfs=files.filter(entry=>/\\.pdf$/i.test(entry.name));
  const txts=files.filter(entry=>/\\.txt$/i.test(entry.name));
