@@ -80,3 +80,54 @@ selectionBar.addEventListener('click',e=>{
  if(e.target.closest('[data-highlight-bookmark]'))bookmarkFromSelection()
 });document.addEventListener('pointerdown',e=>{if(!e.target.closest('#selectionToolbar')&&!e.target.closest('#readingBody'))hideSelectionToolbar()});let progressTimer;window.addEventListener('scroll',()=>{if(state.screen==='reader'){clearTimeout(progressTimer);progressTimer=setTimeout(saveProgress,450)}});
 await refresh();enhanceSelects();initTheme();initTTS();setTTSEngine();if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});setScreen('library');
+
+// Top-level Library / Galleries navigation and user-defined library categories.
+function setMainSection(section){
+ const gallery=section==='gallery';
+ state.filter=gallery?'gallery':'all';
+ document.querySelectorAll('[data-main-section]').forEach(button=>{
+  const active=button.dataset.mainSection===(gallery?'gallery':'library');
+  button.classList.toggle('active',active);
+  button.setAttribute('aria-current',active?'page':'false');
+ });
+ document.querySelectorAll('[data-filter]').forEach(button=>button.classList.toggle('active',button.dataset.filter===state.filter));
+ drawLibrary();
+}
+document.querySelectorAll('[data-main-section]').forEach(button=>{
+ button.addEventListener('click',()=>setMainSection(button.dataset.mainSection));
+});
+$('homeBtn')?.addEventListener('click',()=>setMainSection('library'));
+$('customCategoryFilters')?.addEventListener('click',event=>{
+ const button=event.target.closest('[data-category-filter]');
+ if(!button)return;
+ state.tagFilter=button.dataset.categoryFilter;
+ if($('tagFilter'))$('tagFilter').value=state.tagFilter;
+ drawLibrary();
+});
+function manageLibraryCategories(){
+ let categories=(()=>{try{const value=JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]');return Array.isArray(value)?value.filter(x=>typeof x==='string'):[]}catch{return []}})();
+ const body='<div class="stack"><p class="muted tiny">Create your own library categories. Assign a category to a novel from its details → Edit tags. Categories also appear as quick filters above your library.</p><div class="row category-create-row"><input id="newLibraryCategory" placeholder="Category name" maxlength="32"><button id="addLibraryCategory" class="primary">Add</button></div><div id="libraryCategoryList" class="category-manager-list"></div></div>';
+ modal('Manage categories',body,()=>{
+  const host=$('libraryCategoryList');
+  const render=()=>{
+   host.innerHTML=categories.length?categories.map((name,index)=>'<div class="category-manager-item"><span class="category-dot"></span><b>'+String(name).replace(/[&<>"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]))+'</b><span class="grow"></span><button type="button" data-remove-category="'+index+'" aria-label="Remove '+String(name).replace(/"/g,'&quot;')+'">Remove</button></div>').join(''):'<p class="muted tiny">No custom categories yet.</p>';
+  };
+  const save=()=>{localStorage.setItem('qrLibraryCategories',JSON.stringify(categories));drawLibrary();render()};
+  $('addLibraryCategory').onclick=()=>{
+   const input=$('newLibraryCategory'),name=input.value.trim();
+   if(!name)return toast('Enter a category name');
+   if(categories.some(item=>item.toLocaleLowerCase()===name.toLocaleLowerCase()))return toast('That category already exists');
+   categories.push(name);categories.sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));input.value='';save();
+  };
+  $('newLibraryCategory').onkeydown=event=>{if(event.key==='Enter')$('addLibraryCategory').click()};
+  host.onclick=event=>{
+   const button=event.target.closest('[data-remove-category]');
+   if(!button)return;
+   categories.splice(Number(button.dataset.removeCategory),1);
+   if(state.tagFilter&&!categories.includes(state.tagFilter))state.tagFilter='all';
+   save();
+  };
+  render();
+ });
+}
+$('manageCategories')?.addEventListener('click',manageLibraryCategories);
