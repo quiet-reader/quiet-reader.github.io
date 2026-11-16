@@ -185,7 +185,7 @@ async function readZipArchive(file){
 }
 
 function zipFiles(zip){return Object.values(zip.files||{}).filter(entry=>!entry.dir)}
-function findZipEntry(zip,predicate){return zipFiles(zip).find(entry=>predicate(entry.name.replace(/\\\\/g,'/')))}
+function findZipEntry(zip,predicate){return zipFiles(zip).find(entry=>predicate(entry.name.split(String.fromCharCode(92)).join('/')))}
 function guessMime(name){
  const ext=String(name).split('.').pop().toLowerCase();
  return ({jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',avif:'image/avif',svg:'image/svg+xml',bmp:'image/bmp',epub:'application/epub+zip',pdf:'application/pdf',txt:'text/plain'})[ext]||'application/octet-stream';
@@ -198,7 +198,7 @@ async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId){
  for(const img of [...doc.querySelectorAll('img')]){
   const src=img.getAttribute('src')||'';
   const filename=decodeURIComponent(src.split(/[?#]/,1)[0].split('/').pop()||'');
-  const match=filename.match(/^(\\d+)\\.b64\\.png$/i);
+  const match=filename.match(/^([0-9]+)[.]b64[.]png$/i);
   if(!match)continue;
   const entry=findZipEntry(zip,name=>name.endsWith('/'+pluginId+'/'+novelId+'/'+chapterId+'/'+filename)||name.endsWith('/'+novelId+'/'+chapterId+'/'+filename));
   if(entry){
@@ -219,23 +219,23 @@ async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId){
   const inner=[...node.childNodes].map(walk).join('');
   return blockTags.has(tag)?'\\n\\n'+inner+'\\n\\n':inner;
  };
- const text=walk(doc.body).replace(/\\r/g,'').replace(/[ \\t]+\\n/g,'\\n').replace(/\\n[ \\t]+/g,'\\n').replace(/\\n{3,}/g,'\\n\\n').trim();
+ const rawText=walk(doc.body).split(String.fromCharCode(13)).join('');\n const text=rawText.split(String.fromCharCode(10)).map(line=>line.trim()).join(String.fromCharCode(10)).replaceAll(String.fromCharCode(10).repeat(3),String.fromCharCode(10).repeat(2)).trim();
  return {text,images};
 }
 async function readLNReaderArchive(file){
  const outer=await JSZip.loadAsync(file);
- const dataEntry=findZipEntry(outer,name=>/^(?:.*\\/)?data\\.zip$/i.test(name));
+ const dataEntry=findZipEntry(outer,name=>name.toLowerCase()==='data.zip'||name.toLowerCase().endsWith('/data.zip'));
  if(!dataEntry)throw new Error('This ZIP is not a recognised LNReader backup. Expected its data.zip archive.');
  const dataZip=await JSZip.loadAsync(await dataEntry.async('uint8array'));
- const novelFolder=findZipEntry(dataZip,name=>/(?:^|\\/)NovelAndChapters\\/[^/]+\\.json$/i.test(name));
+ const novelFolder=findZipEntry(dataZip,name=>name.toLowerCase().includes('novelandchapters/')&&name.toLowerCase().endsWith('.json'));
  if(!novelFolder)throw new Error('The LNReader data archive has no NovelAndChapters records.');
- const categoryEntry=findZipEntry(dataZip,name=>/(?:^|\\/)Category\\.json$/i.test(name));
+ const categoryEntry=findZipEntry(dataZip,name=>name.toLowerCase()==='category.json'||name.toLowerCase().endsWith('/category.json'));
  let categories=[];
  if(categoryEntry){try{categories=JSON.parse(await categoryEntry.async('string'))||[]}catch{}}
  const categoryNames=new Map(categories.map(category=>[Number(category.id),String(category.name||'')]));
- const novelFilesEntry=findZipEntry(outer,name=>/^(?:.*\\/)?novel-files\\.zip$/i.test(name));
+ const novelFilesEntry=findZipEntry(outer,name=>name.toLowerCase()==='novel-files.zip'||name.toLowerCase().endsWith('/novel-files.zip'));
  const novelFiles=novelFilesEntry?await JSZip.loadAsync(await novelFilesEntry.async('uint8array')):null;
- const novelEntries=zipFiles(dataZip).filter(entry=>/(?:^|\\/)NovelAndChapters\\/[^/]+\\.json$/i.test(entry.name));
+ const novelEntries=zipFiles(dataZip).filter(entry=>entry.name.toLowerCase().includes('novelandchapters/')&&entry.name.toLowerCase().endsWith('.json'));
  const items=[];
  for(const entry of novelEntries){
   let novel;
@@ -249,7 +249,7 @@ async function readLNReaderArchive(file){
   book.summary=String(novel.summary||'');
   book.tags=[...new Set([...tags,...novelCategories])];
   book.lnReader={pluginId,originalId:id,path:String(novel.path||''),status:novel.status||'',artist:novel.artist||'',source:'LNReader'};
-  if(typeof novel.cover==='string'&&/^https?:\\/\\//i.test(novel.cover))book.cover=novel.cover;
+  if(typeof novel.cover==='string'&&(novel.cover.startsWith('https://')||novel.cover.startsWith('http://')))book.cover=novel.cover;
   else if(novel.cover){
    const cover=findZipEntry(dataZip,name=>name==='Covers/'+id||name.endsWith('/Covers/'+id)||name==='Covers/'+id+'.png'||name.endsWith('/Covers/'+id+'.png'));
    if(cover){const bytes=await cover.async('uint8array');book.cover='data:image/png;base64,'+bytesToBase64(bytes)}
@@ -315,7 +315,7 @@ function parseLNReaderJson(data){
 }
 async function createGalleryFromZipEntries(file,entries){
  if(!entries.length)throw new Error('No supported images were found in this ZIP.');
- const title=String(file.name||'Image gallery').replace(/\\.zip$/i,'')||'Imported gallery';
+ const title=String(file.name||'Image gallery').replace(/[.]zip$/i,'')||'Imported gallery';
  const book=freshBook('gallery',title);
  book.gallery={images:[],view:'grid',history:[],createdAt:Date.now(),lastOpenedAt:null};
  for(const entry of entries){
@@ -333,8 +333,8 @@ export async function importZipCollection(file,mode='library'){
  if(!window.JSZip)throw new Error('The ZIP library did not load. Check your connection and retry.');
  const archive=await JSZip.loadAsync(file);
  const files=zipFiles(archive);
- if(archive.file('manifest.json')||findZipEntry(archive,name=>/^(?:.*\\/)?data\\.zip$/i.test(name)))return importBackup(file);
- const images=files.filter(entry=>/\\.(png|jpe?g|gif|webp|avif|svg|bmp)$/i.test(entry.name));
+ if(archive.file('manifest.json')||findZipEntry(archive,name=>name.toLowerCase()==='data.zip'||name.toLowerCase().endsWith('/data.zip')))return importBackup(file);
+ const images=files.filter(entry=>/[.](png|jpe?g|gif|webp|avif|svg|bmp)$/i.test(entry.name));
  if(mode==='gallery'){
   if(state.screen==='book'&&state.book?.source==='gallery'){
    const selected=[];
@@ -344,9 +344,9 @@ export async function importZipCollection(file,mode='library'){
   }
   return createGalleryFromZipEntries(file,images);
  }
- const epubs=files.filter(entry=>/\\.epub$/i.test(entry.name));
- const pdfs=files.filter(entry=>/\\.pdf$/i.test(entry.name));
- const txts=files.filter(entry=>/\\.txt$/i.test(entry.name));
+ const epubs=files.filter(entry=>/[.]epub$/i.test(entry.name));
+ const pdfs=files.filter(entry=>/[.]pdf$/i.test(entry.name));
+ const txts=files.filter(entry=>/[.]txt$/i.test(entry.name));
  if(!epubs.length&&!pdfs.length&&!txts.length)return createGalleryFromZipEntries(file,images);
  for(const entry of epubs){const blob=await entry.async('blob');await importEPUB(new File([blob],entry.name.split('/').pop(),{type:'application/epub+zip'}))}
  for(const entry of pdfs){const blob=await entry.async('blob');await importPDF(new File([blob],entry.name.split('/').pop(),{type:'application/pdf'}))}
@@ -386,7 +386,7 @@ function applyPreferences(data){
 export async function importBackup(file){
  try{
   let restored;
-  if(/\\.zip$/i.test(file.name)||file.type==='application/zip'||file.type==='application/x-zip-compressed'){
+  if(String(file.name||'').toLowerCase().endsWith('.zip')||file.type==='application/zip'||file.type==='application/x-zip-compressed'){
    const archive=await JSZip.loadAsync(file);
    if(archive.file('manifest.json'))restored=await readZipArchive(file);
    else restored=await readLNReaderArchive(file);
