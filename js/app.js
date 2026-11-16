@@ -64,12 +64,12 @@ function appearanceModal(){
  const body='<div class="appearance-tabs" role="tablist"><button type="button" class="active" data-appearance-tab="themes">Themes</button><button type="button" data-appearance-tab="accents">Accents</button><button type="button" data-appearance-tab="background">Background</button></div><section class="appearance-pane" data-appearance-pane="themes"><div class="appearance-options">'+rows+'</div></section><section class="appearance-pane hidden" data-appearance-pane="accents"><p class="muted tiny">Choose a preset or pick any accent colour. This updates highlights, controls, the brand mark and favicon.</p><div class="accent-presets">'+chips+'</div><label class="appearance-color-field">Custom accent<input id="customAccentColor" type="color" value="'+(localStorage.getItem('qrAccent')||'#b9f27c')+'"></label></section><section class="appearance-pane hidden" data-appearance-pane="background"><p class="muted tiny">Choose an independent page background. Panels adapt automatically.</p><label class="appearance-color-field">Background colour<input id="customBackgroundColor" type="color" value="'+(localStorage.getItem('qrBackground')||'#171d26')+'"></label><button type="button" id="resetBackgroundColor">Reset to theme background</button></section>';
  modal('Appearance',body,()=>{
   const host=$('modalHost');
-  host.addEventListener('click',e=>{
+  host.onclick=e=>{
    const tab=e.target.closest('[data-appearance-tab]');if(tab){host.querySelectorAll('[data-appearance-tab]').forEach(x=>x.classList.toggle('active',x===tab));host.querySelectorAll('[data-appearance-pane]').forEach(x=>x.classList.toggle('hidden',x.dataset.appearancePane!==tab.dataset.appearanceTab));return}
    const option=e.target.closest('[data-appearance-theme]');if(option){applyTheme(option.dataset.appearanceTheme);host.querySelectorAll('[data-appearance-theme]').forEach(x=>{x.classList.toggle('active',x===option);x.querySelector('.appearance-option-check').textContent=x===option?'✓':''})}
    const chip=e.target.closest('[data-accent]');if(chip){applyAccent(chip.dataset.accent);$('customAccentColor').value=chip.dataset.accent}
    if(e.target.closest('#resetBackgroundColor')){applyBackground(null);$('customBackgroundColor').value=({default:'#171d26',dark:'#10141b',midnight:'#090e18',ocean:'#0b1820',forest:'#101b17',plum:'#19131f',sepia:'#eee2ce',light:'#f4f6f8'}[localStorage.getItem('qbtheme')||'default'])}
-  });
+  };
   $('customAccentColor').oninput=e=>applyAccent(e.target.value);
   $('customBackgroundColor').oninput=e=>applyBackground(e.target.value);
  });
