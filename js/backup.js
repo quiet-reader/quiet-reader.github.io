@@ -251,7 +251,7 @@ async function readLNReaderArchive(file){
   book.lnReader={pluginId,originalId:id,path:String(novel.path||''),status:novel.status||'',artist:novel.artist||'',source:'LNReader'};
   if(typeof novel.cover==='string'&&/^https?:\\/\\//i.test(novel.cover))book.cover=novel.cover;
   else if(novel.cover){
-   const cover=findZipEntry(dataZip,name=>name.endsWith('/Covers/'+id)||name.endsWith('/Covers/'+id+'.png'));
+   const cover=findZipEntry(dataZip,name=>name==='Covers/'+id||name.endsWith('/Covers/'+id)||name==='Covers/'+id+'.png'||name.endsWith('/Covers/'+id+'.png'));
    if(cover){const bytes=await cover.async('uint8array');book.cover='data:image/png;base64,'+bytesToBase64(bytes)}
   }
   const readChapters=novel.chapters.map((chapter,index)=>({chapter,index})).sort((a,b)=>(Number(a.chapter.position??a.index)-Number(b.chapter.position??b.index)));
@@ -262,9 +262,10 @@ async function readLNReaderArchive(file){
     const htmlEntry=findZipEntry(novelFiles,name=>name.endsWith('/'+pluginId+'/'+id+'/'+chapter.id+'/index.html')||name.endsWith('/'+id+'/'+chapter.id+'/index.html'));
     if(htmlEntry){try{const decoded=await decodeHtmlChapter(await htmlEntry.async('string'),novelFiles,pluginId,id,chapter.id);text=decoded.text;images=decoded.images}catch(error){console.warn('LNReader chapter import failed',chapter.name,error)}}
    }
+   const chapterIndex=book.chapters.length;
    const now=Date.now();
    const readAt=chapter.readTime?new Date(chapter.readTime).getTime():0;
-   if(readAt>lastReadAt){lastReadAt=readAt;lastReadIndex=index}
+   if(readAt>lastReadAt){lastReadAt=readAt;lastReadIndex=chapterIndex}
    book.chapters.push({
     title:String(chapter.name||'Chapter '+(index+1)),text,images,
     createdAt:chapter.releaseTime?new Date(chapter.releaseTime).getTime()||now:now,
