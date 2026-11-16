@@ -33,6 +33,7 @@ function collectionEscape(value){return esc(String(value??''))}
 function collectionDisplaySettings(){return{view:localStorage.getItem('qrLibraryView')||'expanded',columns:Math.max(1,Math.min(6,Number(localStorage.getItem('qrLibraryColumns')||3)))}}
 function drawCollections(grid){
  const collections=readCollections(),active=state.collectionId?collections.find(c=>c.id===state.collectionId):null;
+ document.body.classList.toggle('collection-fullscreen',Boolean(active));
  const {view,columns}=collectionDisplaySettings();
  grid.style.setProperty('--library-columns',String(columns));grid.classList.toggle('compact-view',view==='compact');grid.classList.toggle('expanded-view',view!=='compact');
  if(!active){
@@ -88,6 +89,8 @@ function savedTagColors(){try{return JSON.parse(localStorage.getItem('qrTagColor
 function tagColor(tag,index){return savedTagColors()[tag]||defaultTagColors[index%defaultTagColors.length]}
 export async function refresh(){const items=await getAll();state.books=items.filter(x=>x.kind==='book');state.pastes=items.filter(x=>x.kind==='paste');drawLibrary()}
 export function drawLibrary(){
+ document.body.classList.toggle('collection-fullscreen',state.filter==='collections'&&Boolean(state.collectionId));
+ $('bookGrid')?.classList.toggle('collection-workspace',state.filter==='collections');
  const entryDefaults=[['all','All entries'],['epub','EPUB'],['manhwa','Manhwa'],['pdf','PDF'],['manual','Novels'],['gallery','Galleries']];
  let entryConfig={};try{entryConfig=JSON.parse(localStorage.getItem('qrLibraryEntryConfig')||'{}')||{}}catch{entryConfig={}}
  document.querySelectorAll('#libraryEntryTabs [data-filter]').forEach(button=>{const key=button.dataset.filter,config=entryConfig[key]||{};button.textContent=config.label||entryDefaults.find(item=>item[0]===key)?.[1]||key;button.classList.toggle('hidden',config.visible===false)});
