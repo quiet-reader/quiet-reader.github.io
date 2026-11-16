@@ -3,6 +3,12 @@ let currentBookTab='chapters';
 let librarySearchQuery='';
 let librarySearchMode='everything';
 const dateTime=value=>Number.isFinite(Number(value))&&Number(value)>0?new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date(Number(value))):'Date unavailable';
+function updatedLabel(value){
+ const time=Number(value)||0;if(!time)return 'Added recently';
+ const age=Math.max(0,Date.now()-time),minutes=Math.floor(age/60000),hours=Math.floor(age/3600000),days=Math.floor(age/86400000);
+ if(minutes<1)return 'Updated just now';if(minutes<60)return 'Updated '+minutes+'m ago';if(hours<24)return 'Updated '+hours+'h ago';if(days<7)return 'Updated '+days+'d ago';
+ return 'Updated '+new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric'}).format(new Date(time));
+}
 const defaultTagColors=['#d7c477','#83b8e8','#8bc58b','#e7a0bd','#b9a0e8','#e5a16b','#72c5bd','#d58f8f'];
 function savedTagColors(){try{return JSON.parse(localStorage.getItem('qrTagColors')||'{}')}catch{return {}}}
 function tagColor(tag,index){return savedTagColors()[tag]||defaultTagColors[index%defaultTagColors.length]}
@@ -33,10 +39,35 @@ export function drawLibrary(){
     : '<div class="empty">No entries in this category yet.</div>';
  }
  for(const b of list){
-  const card=document.createElement('article');card.className='book-card';
-  const pct=b.chapters?.length?Math.round((b.progress?.chapter||0)/b.chapters.length*100):0;const characterCount=(b.chapters||[]).reduce((sum,ch)=>sum+String(ch.text||'').length,0);const rating=Number(b.rating)||0;
-  const relationships=b.relationships||[];const relationBadge=relationships.length?'<div class="novel-link-badges">'+relationships.map(r=>'<span title="'+esc(r.type)+'">'+(r.type==='counterpart'?'↔':r.type==='sequel'?'→':'←')+'</span>').join('')+'</div>':'';const tags=(b.tags||[]).map(t=>'<span class="book-tag" style="--tag-color:'+tagColor(t,availableTags.indexOf(t))+'">#'+esc(t)+'</span>').join('');
-  const itemType=b.source==='gallery'?'Gallery':'Book';const sourceLabel=b.source==='pdf'?' · PDF':b.source==='epub'?' · EPUB':'';card.innerHTML='<div class="book-cover">'+(b.cover?'<img src="'+b.cover+'" alt="">':'▤')+'</div><div class="book-info"><div class="book-title-row"><div class="book-title">'+esc(b.title)+'</div><span class="library-type-badge '+(itemType==='Gallery'?'gallery':'book')+'">'+itemType+sourceLabel+'</span></div><div class="tiny muted">'+esc(b.author||'Unknown author')+' · '+(b.source==='gallery'?(b.gallery?.images?.length||0)+' images'+(b.chapters?.length?' · '+b.chapters.length+' chapters':''):b.chapters.length+' chapters · '+characterCount.toLocaleString()+' characters')+' · '+(rating?'<span class="book-rating-stars">'+'★'.repeat(rating)+'☆'.repeat(5-rating)+'</span> '+rating+'/5':'Not rated')+' '+(b.locked?'· 🔒':'')+'</div>'+relationBadge+(tags?'<div class="book-tags">'+tags+'</div>':'')+'<div class="progress-track"><span style="width:'+pct+'%"></span></div><div class="actions"><button data-open="'+b.id+'">Open</button>'+((b.chapters?.length||b.source==='gallery'&&(b.gallery?.images||[]).length)?'<button data-continue="'+b.id+'">Continue</button>':'')+'<button data-delete="'+b.id+'" '+(b.locked?'disabled title="Unlock this novel before deleting it"':'')+'>Delete</button></div></div>';
+  const gallery=b.source==='gallery';
+  const card=document.createElement('article');
+  card.className='book-card '+(gallery?'gallery-card':'novel-card');
+  card.dataset.cardOpen=b.id;
+  const chapters=b.chapters||[];
+  const images=b.gallery?.images||[];
+  const pct=chapters.length?Math.min(100,Math.round((Number(b.progress?.chapter)||0)/chapters.length*100)):0;
+  const characterCount=chapters.reduce((sum,ch)=>sum+String(ch.text||'').length,0);
+  const rating=Number(b.rating)||0;
+  const relationships=b.relationships||[];
+  const relationBadge=relationships.length?'<div class="novel-link-badges">'+relationships.map(r=>'<span title="'+esc(r.type)+'">'+(r.type==='counterpart'?'↔':r.type==='sequel'?'→':'←')+'</span>').join('')+'</div>':'';
+  const tags=(b.tags||[]).map(t=>'<span class="book-tag" style="--tag-color:'+tagColor(t,availableTags.indexOf(t))+'">#'+esc(t)+'</span>').join('');
+  const sourceLabel=gallery?'GALLERY':b.source==='epub'?'EPUB':b.source==='pdf'?'PDF':b.source==='lnreader'?'LNREADER':'MY NOVEL';
+  const coverSource=gallery?(b.cover||images[0]?.data):b.cover;
+  const cover=coverSource?'<img loading="lazy" decoding="async" src="'+coverSource+'" alt="">':'<div class="cover-placeholder"><span>'+(gallery?'▧':'q.')+'</span><small>'+(gallery?'IMAGE COLLECTION':'QUIET READER')+'</small></div>';
+  const stats=gallery?images.length+' images':chapters.length+' chapters';
+  const detail=gallery?((b.author||'Personal collection')+' · '+stats):(b.author||'Unknown author')+' · '+stats+' · '+characterCount.toLocaleString()+' chars';
+  const galleryProgress=gallery&&images.length?'<div class="gallery-cover-count">'+images.length+' IMAGES</div>':'';
+  card.innerHTML='<div class="book-cover '+(gallery?'gallery-cover':'novel-cover')+'">'+cover+galleryProgress+'</div>'+
+   '<div class="book-info">'+
+    '<div class="card-topline"><span class="library-type-badge '+(gallery?'gallery':'book')+'">'+sourceLabel+'</span><time class="card-updated">'+esc(updatedLabel(b.updated))+'</time></div>'+
+    '<div class="book-title-row"><div class="book-title">'+esc(b.title||'Untitled')+'</div>'+(b.locked?'<span class="card-lock" title="Locked">⌑</span>':'')+'</div>'+
+    '<div class="book-subtitle">'+esc(detail)+'</div>'+
+    (relationBadge||'')+(tags?'<div class="book-tags">'+tags+'</div>':'')+
+    (gallery?'':'<div class="progress-row"><div class="progress-track"><span style="width:'+pct+'%"></span></div><span class="progress-label">'+(pct?pct+'%':'NEW')+'</span></div>')+
+    '<div class="actions"><button class="card-open-action" data-open="'+b.id+'">'+(gallery?'Open gallery':'Open details')+'</button>'+
+    ((chapters.length||gallery&&images.length)?'<button class="card-continue-action" data-continue="'+b.id+'">'+(gallery?'View images':'Continue reading')+'</button>':'')+
+    '<button class="card-delete-action" data-delete="'+b.id+'" '+(b.locked?'disabled title="Unlock this entry before deleting it"':'')+' aria-label="Delete '+esc(b.title)+'">⋯</button></div>'+
+   '</div>';
   grid.append(card);
  }
  const listEl=$('pasteList');listEl.innerHTML='';
@@ -75,6 +106,6 @@ export async function saveBookNotes(){
  toast('Notes saved');
 }
 export function createNovel(){modal('Create a novel','<div class="stack"><label>Title<input id="newTitle" placeholder="Novel title"></label><label>Author (optional)<input id="newAuthor"></label><label>Tags (comma-separated)<input id="newTags" placeholder="cultivation, xianxia, fantasy"></label><button id="createNow" class="primary">Create novel</button></div>',()=>{$('createNow').onclick=async()=>{const b=freshBook('manual',$('newTitle').value.trim()||'Untitled novel');b.author=$('newAuthor').value.trim();b.tags=[...new Set($('newTags').value.split(',').map(t=>t.trim().replace(/^#/,'' )).filter(Boolean))];await put(b);await refresh();openBook(b.id);$('modalHost').innerHTML=''}})}
-export async function handleLibraryClick(e){const btn=e.target.closest('button');if(!btn)return;const id=btn.dataset.open||btn.dataset.continue||btn.dataset.delete;if(id){const b=state.books.find(x=>x.id===id);if(btn.dataset.delete!==undefined){if(b.locked){toast('Unlock this novel before deleting it');return}if(confirm('Delete this book and its local data?')){await remove(id);await refresh()}}else{state.book=b;if(b.source==='gallery'){const now=Date.now();b.gallery=b.gallery||{images:[],view:'grid',history:[],createdAt:b.createdAt||b.updated||now};b.gallery.lastOpenedAt=now;b.gallery.history=(b.gallery.history||[]).concat({imageId:null,imageName:'Opened gallery',openedAt:now}).slice(-10);void put(b)}currentBookTab=b.source==='gallery'?'gallery':'chapters';drawBook();if(btn.dataset.continue!==undefined)openReader(b.progress?.chapter||0);else setScreen('book')}return}const pid=btn.dataset.pasteOpen||btn.dataset.pasteDelete;if(pid){const p=state.pastes.find(x=>x.id===pid);if(btn.dataset.pasteDelete!==undefined){if(confirm('Delete this saved chapter?')){await remove(pid);await refresh()}}else{$('pasteTitle').value=p.title||'';$('pasteText').value=p.text||'';setScreen('paste')}}}
+export async function handleLibraryClick(e){const btn=e.target.closest('button');if(!btn){const card=e.target.closest('[data-card-open]');if(card)openBook(card.dataset.cardOpen);return}const id=btn.dataset.open||btn.dataset.continue||btn.dataset.delete;if(id){const b=state.books.find(x=>x.id===id);if(btn.dataset.delete!==undefined){if(b.locked){toast('Unlock this novel before deleting it');return}if(confirm('Delete this book and its local data?')){await remove(id);await refresh()}}else{state.book=b;if(b.source==='gallery'){const now=Date.now();b.gallery=b.gallery||{images:[],view:'grid',history:[],createdAt:b.createdAt||b.updated||now};b.gallery.lastOpenedAt=now;b.gallery.history=(b.gallery.history||[]).concat({imageId:null,imageName:'Opened gallery',openedAt:now}).slice(-10);void put(b)}currentBookTab=b.source==='gallery'?'gallery':'chapters';drawBook();if(btn.dataset.continue!==undefined)openReader(b.progress?.chapter||0);else setScreen('book')}return}const pid=btn.dataset.pasteOpen||btn.dataset.pasteDelete;if(pid){const p=state.pastes.find(x=>x.id===pid);if(btn.dataset.pasteDelete!==undefined){if(confirm('Delete this saved chapter?')){await remove(pid);await refresh()}}else{$('pasteTitle').value=p.title||'';$('pasteText').value=p.text||'';setScreen('paste')}}}
 export async function savePasteAsBook(read=false){const text=$('pasteText').value.trim(),title=$('pasteTitle').value.trim();if(!text)return toast('Paste chapter text first');const b=freshBook('manual',title||'Pasted chapter');const now=Date.now();b.chapters=[{title:title||'Chapter 1',text,images:[],createdAt:now,updatedAt:now,history:[]}];await put(b);await refresh();state.book=b;if(read)openReader(0);else{openBook(b.id);toast('Saved to library')}}
 export async function savePasteOnly(){const text=$('pasteText').value.trim(),title=$('pasteTitle').value.trim();if(!text)return toast('Paste chapter text first');await put({id:Date.now().toString(36)+Math.random().toString(36).slice(2),kind:'paste',title,text,updated:Date.now()});await refresh();toast('Pasted chapter saved')}
