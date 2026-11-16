@@ -1,4 +1,19 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createNovelService, isGalleryRecord, isNovelRecord, type NovelRecord } from "@/application/novels/novelService";
+import { legacyItemRepository } from "@/infrastructure/persistence/legacyDatabase";
+import { NovelWorkspace } from "@/features/novels/NovelWorkspace";
+
+type ThemeName = "light" | "dark" | "sepia" | "midnight" | "forest" | "paper";
+const themeOptions: Array<{ id: ThemeName; label: string; description: string }> = [
+  { id: "light", label: "Light", description: "Clean, balanced and airy." },
+  { id: "dark", label: "Dark", description: "Soft charcoal, #474747." },
+  { id: "sepia", label: "Sepia", description: "Warm paper and ink." },
+  { id: "midnight", label: "Midnight", description: "Deep blue-grey with soft lavender." },
+  { id: "forest", label: "Forest", description: "Muted evergreen and moss." },
+  { id: "paper", label: "Soft paper", description: "Cool, gentle off-white." },
+];
+const novelService = createNovelService(legacyItemRepository);
+
 
 type IconName =
   | "menu" | "history" | "chevron" | "book" | "library" | "gallery"
@@ -65,14 +80,66 @@ export function AppShell() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"Library" | "Galleries" | "Add">("Library");
   const [activePage, setActivePage] = useState("Library");
+  const [books, setBooks] = useState<NovelRecord[]>([]);
+  const [galleryCount, setGalleryCount] = useState(0);
+  const [selectedNovel, setSelectedNovel] = useState<NovelRecord | null>(null);
+  const [workspaceMode, setWorkspaceMode] = useState<"create" | "detail" | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [theme, setTheme] = useState<ThemeName>(() => {
+    try {
+      const saved = window.localStorage.getItem("qr-theme");
+      return saved && themeOptions.some((item) => item.id === saved) ? saved as ThemeName : "light";
+    } catch { return "light"; }
+  });
+
+  const refreshLibrary = async () => {
+    try {
+      const records = await novelService.list();
+      setBooks(records.filter(isNovelRecord));
+      setGalleryCount(records.filter(isGalleryRecord).length);
+      setLoadError("");
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to read the local library.");
+    }
+  };
+
+  useEffect(() => { void refreshLibrary(); }, []);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#474747" : theme === "midnight" ? "#171a21" : theme === "forest" ? "#1f2924" : theme === "sepia" ? "#f1e6d1" : theme === "paper" ? "#f2f4f5" : "#f7f7f4");
+    try { window.localStorage.setItem("qr-theme", theme); } catch { /* Theme still works for this session. */ }
+  }, [theme]);
 
   const selectPage = (label: string) => {
     setActivePage(label);
     setMenuOpen(false);
-    setActiveTab(label === "Library" ? "Library" : activeTab);
+    if (label === "Library") { setWorkspaceMode(null); setSelectedNovel(null); }
   };
-
   const activeIcon: IconName = navigation.find((item) => item.label === activePage)?.icon ?? "sparkle";
+
+  function startNewNovel() {
+    setActivePage("Library");
+    setSelectedNovel(null);
+    setWorkspaceMode("create");
+    setMenuOpen(false);
+  }
+
+  function openNovel(novel: NovelRecord) {
+    setActivePage("Library");
+    setSelectedNovel(novel);
+    setWorkspaceMode("detail");
+  }
+
+  async function handleCreated(novel: NovelRecord) {
+    setSelectedNovel(novel);
+    setWorkspaceMode("detail");
+    await refreshLibrary();
+  }
+
+  async function handleUpdated(novel: NovelRecord) {
+    setSelectedNovel(novel);
+    await refreshLibrary();
+  }
 
   return (
     <div className="app-shell">
@@ -89,13 +156,12 @@ export function AppShell() {
           <span className="topbar-caption">A little space to get lost in a story.</span>
         </div>
         <div className="topbar-end">
-          <div className="top-stat"><span className="stat-number">0</span><span>books</span></div>
+          <div className="top-stat"><span className="stat-number">{books.length}</span><span>books</span></div>
           <span className="stat-separator" />
-          <div className="top-stat"><span className="stat-number">0</span><span>chapters</span></div>
+          <div className="top-stat"><span className="stat-number">{galleryCount}</span><span>galleries</span></div>
           <button className="icon-button history-trigger" type="button" aria-label="Reading history" aria-expanded={historyOpen} onClick={() => { setHistoryOpen(!historyOpen); setMenuOpen(false); }}>
             <Icon name="history" size={19} />
           </button>
-          <div className="avatar" aria-label="Your profile">Q</div>
         </div>
       </header>
 
@@ -104,7 +170,7 @@ export function AppShell() {
         {navigation.map((item) => <div key={item.label}>
           {item.group && <p className="menu-group">{item.group}</p>}
           <button className={`menu-item ${activePage === item.label ? "selected" : ""}`} onClick={() => selectPage(item.label)} type="button">
-            <Icon name={item.icon} size={17} /><span>{item.label}</span>{item.label === "Library" && <span className="menu-count">0</span>}
+            <Icon name={item.icon} size={17} /><span>{item.label}</span>{item.label === "Library" && <span className="menu-count">{books.length}</span>}
           </button>
         </div>)}
         <div className="menu-footer"><span className="online-dot" /> Your library lives on this device</div>
@@ -112,53 +178,56 @@ export function AppShell() {
 
       {historyOpen && <div className="history-popover">
         <div className="popover-title"><div><span className="popover-eyebrow">YOUR JOURNEY</span><h3>Reading history</h3></div><button className="icon-button" onClick={() => setHistoryOpen(false)} aria-label="Close history">×</button></div>
-        <div className="popover-empty"><span className="empty-icon small"><Icon name="clock" size={21} /></span><strong>Your story starts here</strong><p>Books you read will find a place in your history.</p></div>
+        <div className="popover-empty"><span className="empty-icon small"><Icon name="clock" size={21} /></span><strong>Your story starts here</strong><p>Reading history will appear here as you read.</p></div>
       </div>}
 
       <main className="main-content">
-        {activePage === "Library" ? <>
-          <section className="welcome-row">
-            <div>
-              <p className="eyebrow"><span className="eyebrow-line" /> YOUR PERSONAL READING SPACE</p>
-              <h1>Make room for <em>stories.</em></h1>
-              <p className="welcome-copy">Your books, your pace, your quiet corner of the world.</p>
-            </div>
-            <div className="welcome-art" aria-hidden="true">
-              <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" />
-              <div className="art-book book-back" /><div className="art-book book-front"><span>THE ART OF<br />SLOW READING</span><i>✳</i></div>
-              <span className="art-spark spark-one">✳</span><span className="art-spark spark-two">✧</span>
-            </div>
-          </section>
-
+        {workspaceMode ? (
+          <NovelWorkspace
+            key={`${workspaceMode}-${selectedNovel?.id ?? "new"}`}
+            mode={workspaceMode}
+            novel={selectedNovel ?? undefined}
+            service={novelService}
+            onBack={() => { setWorkspaceMode(null); setSelectedNovel(null); void refreshLibrary(); }}
+            onCreated={(novel) => { void handleCreated(novel); }}
+            onUpdated={(novel) => { void handleUpdated(novel); }}
+          />
+        ) : activePage === "Library" ? <>
           <nav className="section-tabs" aria-label="Library sections">
             {tabs.map((tab) => {
               const tabIcon: IconName = tab === "Library" ? "book" : tab === "Galleries" ? "gallery" : "plus";
               return <button key={tab} className={`section-tab ${activeTab === tab ? "active" : ""}`} onClick={() => setActiveTab(tab)} type="button"><Icon name={tabIcon} size={16} />{tab}</button>;
             })}
             <div className="tabs-spacer" />
-            <button className="subtle-button search-button" type="button"><Icon name="search" size={16} /><span>Search your library</span><kbd>⌘ K</kbd></button>
-            <button className="icon-button view-button" type="button" aria-label="Grid view"><Icon name="grid" size={17} /></button>
+            <span className="library-summary">{books.length} books <span>·</span> {galleryCount} galleries</span>
           </nav>
 
           {activeTab === "Library" && <section className="library-section">
-            <div className="section-heading-row"><div><h2>Your library</h2><p className="section-subtitle">Everything you want to read, all in one place.</p></div><span className="count-pill">0 books</span></div>
+            <div className="section-heading-row"><div><h2>Your library</h2><p className="section-subtitle">Your reading collection, kept on this device.</p></div><button className="primary-button" type="button" onClick={startNewNovel}>＋ New novel</button></div>
+            {loadError && <p className="form-error" role="alert">Could not read IndexedDB: {loadError}</p>}
             <div className="action-grid">
-              {actions.map((action) => <button key={action.label} type="button" className="action-card">
+              {actions.map((action) => <button key={action.label} type="button" className="action-card" onClick={() => action.label === "New novel" ? startNewNovel() : action.label === "New gallery" ? setActiveTab("Galleries") : undefined}>
                 <span className={`action-icon ${action.tone}`}><Icon name={action.icon} size={20} /></span>
                 <span className="action-copy"><strong>{action.label}</strong><small>{action.detail}</small></span>
                 <span className="action-arrow"><Icon name="chevron" size={16} /></span>
               </button>)}
             </div>
-            <div className="library-empty">
-              <div className="empty-illustration"><div className="empty-book empty-book-a" /><div className="empty-book empty-book-b" /><div className="empty-book empty-book-c" /><span className="empty-star star-a">✳</span><span className="empty-star star-b">✧</span></div>
-              <div className="empty-content"><span className="empty-kicker">A FRESH BEGINNING</span><h3>Your next favorite story<br /><em>is waiting to be found.</em></h3><p>Add a book to begin building a library that feels like yours.</p><button className="primary-button" type="button" onClick={() => setActiveTab("Add")}><Icon name="plus" size={17} /> Add your first book <Icon name="arrow" size={16} /></button></div>
-            </div>
+            {books.length ? <div className="novel-card-grid">{books.map((book) => <button className="novel-card" type="button" key={book.id} onClick={() => openNovel(book)}>
+              <span className="novel-card-cover">{book.cover ? <img src={book.cover} alt="" /> : <span>QUIET<br />READER</span>}</span>
+              <span className="novel-card-info"><strong>{book.title}</strong><small>{book.author || "Unknown author"}</small><small>{book.chapters?.length ?? 0} chapters</small></span>
+            </button>)}</div> : <div className="simple-empty library-zero"><span className="empty-icon"><Icon name="book" size={24} /></span><h3>Your library is quiet</h3><p>Create a novel or import a book to see it here.</p><button className="secondary-button" type="button" onClick={startNewNovel}><Icon name="plus" size={16} /> Create your first novel</button></div>}
           </section>}
 
-          {activeTab === "Galleries" && <section className="library-section tab-placeholder"><div className="section-heading-row"><div><h2>Your galleries</h2><p className="section-subtitle">A home for the images and moments inside your stories.</p></div></div><div className="simple-empty"><span className="empty-icon"><Icon name="gallery" size={24} /></span><h3>No galleries yet</h3><p>Create a gallery to keep visual inspiration together.</p><button className="secondary-button" onClick={() => setActiveTab("Add")}><Icon name="plus" size={16} /> Create a gallery</button></div></section>}
+          {activeTab === "Galleries" && <section className="library-section tab-placeholder"><div className="section-heading-row"><div><h2>Your galleries</h2><p className="section-subtitle">Visual collections attached to your reading projects.</p></div></div><div className="simple-empty"><span className="empty-icon"><Icon name="gallery" size={24} /></span><h3>{galleryCount ? `${galleryCount} galleries in your library` : "No galleries yet"}</h3><p>The gallery data engine is ready; gallery management UI is the next layer.</p></div></section>}
 
-          {activeTab === "Add" && <section className="library-section tab-placeholder"><div className="section-heading-row"><div><h2>Bring a story in</h2><p className="section-subtitle">Choose how you'd like to add something to Quiet Reader.</p></div></div><div className="action-grid add-grid">{actions.map((action) => <button key={action.label} type="button" className="action-card"><span className={`action-icon ${action.tone}`}><Icon name={action.icon} size={20} /></span><span className="action-copy"><strong>{action.label}</strong><small>{action.detail}</small></span><span className="action-arrow"><Icon name="chevron" size={16} /></span></button>)}</div></section>}
-        </> : <section className="placeholder-page"><span className="empty-icon"><Icon name={activeIcon} size={24} /></span><p className="eyebrow">QUIET READER WORKSPACE</p><h1>{activePage}</h1><p>This space is part of the new Quiet Reader experience. Its features will be added in a later step.</p><button className="secondary-button" onClick={() => selectPage("Library")}><Icon name="library" size={16} /> Back to library</button></section>}
+          {activeTab === "Add" && <section className="library-section tab-placeholder"><div className="section-heading-row"><div><h2>Bring a story in</h2><p className="section-subtitle">Choose how you'd like to add something to Quiet Reader.</p></div></div><div className="action-grid add-grid">{actions.map((action) => <button key={action.label} type="button" className="action-card" onClick={() => action.label === "New novel" ? startNewNovel() : action.label === "New gallery" ? setActiveTab("Galleries") : undefined}><span className={`action-icon ${action.tone}`}><Icon name={action.icon} size={20} /></span><span className="action-copy"><strong>{action.label}</strong><small>{action.detail}</small></span><span className="action-arrow"><Icon name="chevron" size={16} /></span></button>)}</div></section>}
+        </> : activePage === "Appearance" ? <section className="appearance-page">
+          <p className="eyebrow">MAKE IT YOURS</p><h1>Appearance</h1><p className="section-subtitle">Choose a comfortable palette for your reading space.</p>
+          <div className="theme-grid">{themeOptions.map((option) => <button key={option.id} type="button" className={`theme-card ${theme === option.id ? "selected" : ""}`} onClick={() => setTheme(option.id)}>
+            <span className={`theme-preview theme-preview-${option.id}`}><i /><i /><i /></span><strong>{option.label}</strong><small>{option.description}</small>{theme === option.id && <span className="theme-selected-mark">Selected</span>}
+          </button>)}</div>
+          <div className="font-settings"><h2>Reading font</h2><p>Gotham Pro will load automatically when its TTF files are added to <code>public/fonts/</code>. Until then, the interface uses the system fallback.</p><span className="font-sample">The quick brown fox jumps over the lazy dog.</span></div>
+        </section> : <section className="placeholder-page"><span className="empty-icon"><Icon name={activeIcon} size={24} /></span><p className="eyebrow">QUIET READER WORKSPACE</p><h1>{activePage}</h1><p>This space is part of the new Quiet Reader experience. Its features will be added in a later step.</p><button className="secondary-button" onClick={() => selectPage("Library")}><Icon name="library" size={16} /> Back to library</button></section>}
         <footer className="app-footer"><span><Icon name="leaf" size={13} /> Made for slower moments.</span><span>QUIET READER <i>·</i> A PERSONAL LIBRARY</span></footer>
       </main>
     </div>
