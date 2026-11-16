@@ -107,7 +107,7 @@ export function drawLibrary(){
     '<div class="actions"><button class="card-open-action" data-open="'+b.id+'">'+(gallery?'Open gallery':'Open details')+'</button>'+
     '<button class="card-collection-action" data-add-to-collection="book" data-book-id="'+b.id+'" title="Add to collection">＋ Collection</button>'+
     ((chapters.length||gallery&&images.length)?'<button class="card-continue-action" data-continue="'+b.id+'">'+(gallery?'View images':'Continue reading')+'</button>':'')+
-    '<button class="card-delete-action" data-delete="'+b.id+'" '+(b.locked?'disabled title="Unlock this entry before deleting it"':'')+' aria-label="Delete '+esc(b.title)+'">Delete</button></div>'+
+    '<button class="card-delete-action" data-delete="'+b.id+'" '+(b.locked?'disabled title="Unlock this entry before deleting it"':'')+' aria-label="Delete '+esc(b.title)+'" title="Delete entry"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg></button></div>'+
    '</div>';
   grid.append(card);
  }
