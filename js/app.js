@@ -119,6 +119,8 @@ $('customCategoryFilters')?.addEventListener('click',event=>{
  const button=event.target.closest('[data-category-filter]');
  if(!button)return;
  state.tagFilter=button.dataset.categoryFilter;
+ state.filter='all';syncHeaderActions('library');
+ document.querySelectorAll('[data-filter]').forEach(item=>item.classList.toggle('active',item.dataset.filter==='all'));
  if($('tagFilter'))$('tagFilter').value=state.tagFilter;
  drawLibrary();
 });
