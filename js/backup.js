@@ -285,7 +285,7 @@ async function readLNReaderArchive(file){
  const saved=(()=>{try{return JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]')}catch{return []}})();
  const merged=[...new Set([...saved,...categories.map(category=>String(category.name||'').trim()).filter(Boolean)])];
  localStorage.setItem('qrLibraryCategories',JSON.stringify(merged));
- return {items,theme:null,preferences:null};
+ return {items,theme:null,preferences:null,source:'lnreader-zip'};
 }
 function parseLNReaderJson(data){
  const candidates=[Array.isArray(data)?data:undefined,data?.novels,data?.library?.novels,data?.data?.novels,data?.backup?.novels,data?.items];
@@ -313,7 +313,7 @@ function parseLNReaderJson(data){
  if(!items.length)throw new Error('The LNReader JSON backup contains no novels.');
  const saved=(()=>{try{return JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]')}catch{return []}})();
  localStorage.setItem('qrLibraryCategories',JSON.stringify([...new Set([...saved,...categories.map(category=>String(category.name||'').trim()).filter(Boolean)])]));
- return {items,theme:null,preferences:null};
+ return {items,theme:null,preferences:null,source:'lnreader-json'};
 }
 async function createGalleryFromZipEntries(file,entries){
  if(!entries.length)throw new Error('No supported images were found in this ZIP.');
@@ -402,7 +402,14 @@ export async function importBackup(file){
   // Validate the complete restore before writing; putMany commits all entries together.
   await putMany(restored.items);
   applyPreferences(restored);
-  toast('Backup restored · '+restored.items.length+' entries imported');
+  if(restored.source==='lnreader-json'){
+   toast('LNReader 1.x · '+restored.items.length+' novels imported; chapter files and reading progress are not in this backup');
+  }else if(restored.source==='lnreader-zip'){
+   const books=restored.items.filter(item=>item.kind==='book');
+   const chapters=books.reduce((sum,book)=>sum+(book.chapters||[]).length,0);
+   const readable=books.reduce((sum,book)=>sum+(book.chapters||[]).filter(chapter=>String(chapter.text||'').trim()).length,0);
+   toast('LNReader imported · '+books.length+' novels · '+chapters+' chapters · '+readable+' with text');
+  }else toast('Backup restored · '+restored.items.length+' entries imported');
   location.reload();
  }catch(error){alert('Could not restore backup: '+(error?.message||error))}
 }
