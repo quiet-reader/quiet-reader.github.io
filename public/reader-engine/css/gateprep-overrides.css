@@ -1,0 +1,33 @@
+/* Quiet Reader · GATEPrep visual language */
+:root{--bg:#10141d;--panel:#171d29;--panel2:#1e2735;--fg:#e8edf4;--muted:#8e9aab;--line:#2b3545;--accent:#b9f27c;--auto-read-highlight:#b9f27c}
+body{background:var(--bg);color:var(--fg);font-family:Manrope,"DM Sans",system-ui,sans-serif}
+button,input,textarea,select{font-family:inherit}
+button{background:#171d29;border-color:#2b3545;color:#dfe7f1;transition:background .18s,border-color .18s,transform .18s,box-shadow .18s}
+button:hover{filter:none;border-color:#6f8b58;background:#202a38}
+button.primary{background:var(--accent);color:#10141d;border-color:var(--accent);font-weight:800}
+input,textarea,select{background:#121925;color:#e8edf4;border-color:#2b3545}
+.topbar{background:#10141d;border-bottom:1px solid #2b3545}
+.brand{letter-spacing:.08em}
+.screen{max-width:1240px}
+.heading-row h1,h1{font-weight:800;letter-spacing:-.035em}
+.heading-row p,.muted{color:var(--muted)}
+.panel,.book-card,.chapter-row,.modal,.reader-panel,.drawer{background:#151c28;border-color:#2b3545}
+.book-grid{grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:18px}
+.book-card{border-radius:14px;box-shadow:0 8px 24px #0002}
+.book-card:hover,.book-card:focus-within{border-color:var(--accent);box-shadow:0 0 0 1px #b9f27c45,0 16px 36px #0006}
+.book-cover{background:linear-gradient(145deg,#202b3a,#141b27)}
+.book-info{padding:14px}
+.book-title{color:#f1f5f9}
+.filter-row button.active,.chapter-format-controls button.active{background:var(--accent);color:#10141d;border-color:var(--accent)}
+.empty{background:#141b27;border-color:#344052;color:#aab5c3}
+.reader-toolbar{background:#10141d;border-color:#2b3545}
+.reading-column h1{color:#f3f6fa}
+.reading-body{color:#d8e0ea}
+.reading-body .focus-current{background:#b9f27c12;border-left:2px solid var(--accent);padding-left:12px;border-radius:3px}
+.reading-body .auto-read-sentence{background:#b9f27c;color:#10141d;border-radius:3px}
+.reader-panel{box-shadow:16px 0 44px #0008}
+.library-actions button{opacity:.62;border-color:#3a4657;background:transparent}
+.library-actions button:hover,.library-actions button:focus-visible{opacity:1;border-color:var(--accent);color:var(--accent);background:#b9f27c10}
+.library-actions button.primary{opacity:.85;background:var(--accent);color:#10141d}
+.library-actions button.primary:hover{opacity:1}
+@media(max-width:650px){.book-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.book-cover{height:165px}}
