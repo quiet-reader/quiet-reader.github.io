@@ -46,11 +46,14 @@ function savedTagColors(){try{return JSON.parse(localStorage.getItem('qrTagColor
 function tagColor(tag,index){return savedTagColors()[tag]||defaultTagColors[index%defaultTagColors.length]}
 export async function refresh(){const items=await getAll();state.books=items.filter(x=>x.kind==='book');state.pastes=items.filter(x=>x.kind==='paste');drawLibrary()}
 export function drawLibrary(){
+ const entryDefaults=[['all','All entries'],['epub','EPUB'],['manhwa','Manhwa'],['pdf','PDF'],['manual','Novels'],['gallery','Galleries']];
+ let entryConfig={};try{entryConfig=JSON.parse(localStorage.getItem('qrLibraryEntryConfig')||'{}')||{}}catch{entryConfig={}}
+ document.querySelectorAll('#libraryEntryTabs [data-filter]').forEach(button=>{const key=button.dataset.filter,config=entryConfig[key]||{};button.textContent=config.label||entryDefaults.find(item=>item[0]===key)?.[1]||key;button.classList.toggle('hidden',config.visible===false)});
  const savedCategories=(()=>{try{const value=JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]');return Array.isArray(value)?value.filter(x=>typeof x==='string'&&x.trim()):[]}catch{return []}})();
  const availableTags=[...new Set([...state.books.flatMap(b=>Array.isArray(b.tags)?b.tags:[]).map(t=>String(t).trim()).filter(Boolean),...savedCategories])].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
  const tagSelect=$('tagFilter');
  if(tagSelect){const selected=state.tagFilter||'all';tagSelect.innerHTML='<option value="all">All tags</option>'+availableTags.map(t=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join('');tagSelect.value=availableTags.includes(selected)?selected:'all';state.tagFilter=tagSelect.value}
- const categoryHost=$('customCategoryFilters');if(categoryHost){categoryHost.innerHTML=savedCategories.map(tag=>'<button type="button" data-category-filter="'+esc(tag)+'" class="'+(state.tagFilter===tag?'active':'')+'">'+esc(tag)+'</button>').join('')}
+ const categoryHost=$('customCategoryFilters');if(categoryHost){categoryHost.innerHTML=savedCategories.filter(tag=>entryConfig['tag:'+tag]?.visible!==false).map(tag=>'<button type="button" data-category-filter="'+esc(tag)+'" class="'+(state.tagFilter===tag?'active':'')+'">'+esc(entryConfig['tag:'+tag]?.label||tag)+'</button>').join('')}
  const query=librarySearchQuery.trim().toLocaleLowerCase();
  const stamp=value=>typeof value==='number'?value:(Date.parse(value)||Number(value)||0);
  if(state.filter==='collections'){document.querySelector('.filter-row')?.classList.add('hidden');drawCollections($('bookGrid'));$('pasteList').innerHTML='';$('pastesSection')?.classList.add('hidden');return}
