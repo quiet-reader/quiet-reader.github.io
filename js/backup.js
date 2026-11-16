@@ -207,7 +207,7 @@ async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId){
    const bytes=await entry.async('uint8array');
    const id=safeId();
    images.push({id,data:'data:image/png;base64,'+bytesToBase64(bytes),mime:'image/png',name:filename});
-   img.replaceWith(doc.createTextNode('\\n[IMAGE:'+id+']\\n'));
+   img.replaceWith(doc.createTextNode(String.fromCharCode(10)+'[IMAGE:'+id+']'+String.fromCharCode(10)));
   }else img.remove();
  }
  const blockTags=new Set(['P','DIV','SECTION','ARTICLE','H1','H2','H3','H4','LI','BLOCKQUOTE','BR']);
@@ -215,9 +215,10 @@ async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId){
   if(node.nodeType===Node.TEXT_NODE)return node.nodeValue||'';
   if(node.nodeType!==Node.ELEMENT_NODE)return '';
   const tag=node.tagName;
-  if(tag==='BR')return '\\n';
+  if(tag==='BR')return String.fromCharCode(10);
   const inner=[...node.childNodes].map(walk).join('');
-  return blockTags.has(tag)?'\\n\\n'+inner+'\\n\\n':inner;
+  const separator=String.fromCharCode(10).repeat(2);
+  return blockTags.has(tag)?separator+inner+separator:inner;
  };
  const rawText=walk(doc.body).split(String.fromCharCode(13)).join('');
  const text=rawText.split(String.fromCharCode(10)).map(line=>line.trim()).join(String.fromCharCode(10)).replaceAll(String.fromCharCode(10).repeat(3),String.fromCharCode(10).repeat(2)).trim();
