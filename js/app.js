@@ -117,7 +117,7 @@ document.querySelectorAll('[data-main-section]').forEach(button=>{
 syncHeaderActions(state.filter==='gallery'?'gallery':'library');
 $('homeBtn')?.addEventListener('click',()=>setMainSection('library'));
 $('globalSearchToggle')?.addEventListener('click',()=>{const input=$('globalSearchInput');input.hidden=!input.hidden;if(!input.hidden){input.focus();input.select()}else{input.value='';setLibrarySearch('')}});
-let globalSearchTimer;$('globalSearchInput')?.addEventListener('input',event=>{clearTimeout(globalSearchTimer);const query=event.target.value;globalSearchTimer=setTimeout(()=>setLibrarySearch(query),90)});
+let globalSearchTimer;$('globalSearchInput')?.addEventListener('input',event=>{clearTimeout(globalSearchTimer);const query=event.target.value;if(query.trim()){state.filter='all';state.collectionId=null;syncHeaderActions('library')}globalSearchTimer=setTimeout(()=>setLibrarySearch(query),90)});
 $('globalSearchInput')?.addEventListener('keydown',event=>{if(event.key==='Escape'){event.target.value='';setLibrarySearch('');event.target.hidden=true;$('globalSearchToggle')?.focus()}if(event.key==='Enter'){state.filter='all';syncHeaderActions('library');drawLibrary()}});
 $('customCategoryFilters')?.addEventListener('click',event=>{
  const button=event.target.closest('[data-category-filter]');
