@@ -131,9 +131,10 @@ export function AppShell() {
           </section>
 
           <nav className="section-tabs" aria-label="Library sections">
-            {(["Library", "Galleries", "Add"] as const).map((tab) => <button key={tab} className={`section-tab ${activeTab === tab ? "active" : ""}`} onClick={() => setActiveTab(tab)} type="button}>
-              {tab === "Library" && <Icon name="book" size={16} />}{tab === "Galleries" && <Icon name="gallery" size={16} />}{tab === "Add" && <Icon name="plus" size={16} />}{tab}
-            </button>)}
+            {tabs.map((tab) => {
+              const tabIcon: IconName = tab === "Library" ? "book" : tab === "Galleries" ? "gallery" : "plus";
+              return <button key={tab} className={`section-tab ${activeTab === tab ? "active" : ""}`} onClick={() => setActiveTab(tab)} type="button"><Icon name={tabIcon} size={16} />{tab}</button>;
+            })}
             <div className="tabs-spacer" />
             <button className="subtle-button search-button" type="button"><Icon name="search" size={16} /><span>Search your library</span><kbd>⌘ K</kbd></button>
             <button className="icon-button view-button" type="button" aria-label="Grid view"><Icon name="grid" size={17} /></button>
