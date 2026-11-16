@@ -8,6 +8,7 @@ const palettes={
 export function applyTheme(name){
  const palette=palettes[name]||palettes.default;
  for(const [key,value] of Object.entries(palette))document.documentElement.style.setProperty('--'+key,value);
+ document.documentElement.style.colorScheme=name==='sepia'||name==='light'?'light':'dark';
  localStorage.setItem('qbtheme',name);
  if($('readerTheme'))$('readerTheme').value=name;
 }
