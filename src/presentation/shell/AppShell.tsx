@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { isGalleryRecord, isNovelRecord, type NovelRecord } from "@/application/novels/novelService";
+import { isGalleryRecord } from "@/application/novels/novelService";
 import { legacyItemRepository, type LegacyLibraryRecord } from "@/infrastructure/persistence/legacyDatabase";
 
 type Section = "Library" | "Galleries";
@@ -23,7 +23,6 @@ function toDataUrl(file: File): Promise<string> {
 
 export function AppShell() {
   const [section, setSection] = useState<Section>("Library");
-  const [books, setBooks] = useState<NovelRecord[]>([]);
   const [galleries, setGalleries] = useState<LegacyLibraryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -36,7 +35,6 @@ export function AppShell() {
 
   async function refreshCollection() {
     const records = await legacyItemRepository.getAll();
-    setBooks(records.filter(isNovelRecord));
     setGalleries(records.filter(isGalleryRecord));
     setLoading(false);
   }
@@ -45,7 +43,6 @@ export function AppShell() {
     let active = true;
     legacyItemRepository.getAll().then((records) => {
       if (!active) return;
-      setBooks(records.filter(isNovelRecord));
       setGalleries(records.filter(isGalleryRecord));
       setLoading(false);
     }).catch((reason: unknown) => {
