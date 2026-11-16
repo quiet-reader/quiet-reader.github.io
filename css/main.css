@@ -1318,3 +1318,5 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--b
 .appearance-color-field{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;color:var(--fg);font-size:12px}
 .appearance-color-field input[type=color]{width:52px;height:34px;padding:3px;border-radius:8px}
 @media(max-width:520px){.appearance-options{grid-template-columns:1fr}#screen-book .book-detail-actions.action-strip{gap:4px}#screen-book .book-detail-actions.action-strip button{height:33px}.chapter-toolbar{gap:5px}.chapter-toolbar-actions{grid-auto-columns:minmax(30px,1fr);gap:3px}.chapter-toolbar-actions button{height:33px}}
+
+#screen-library{position:relative;z-index:95}#libraryEntryTabs{z-index:96}
