@@ -23,7 +23,15 @@ export function drawLibrary(){
  });const sort=$('librarySort')?.value||localStorage.getItem('qrLibrarySort')||'recent';list.sort((a,b)=>{const chars=x=>(x.chapters||[]).reduce((sum,ch)=>sum+String(ch.text||'').length,0);if(sort==='title')return String(a.title||'').localeCompare(String(b.title||''));if(sort==='rating-asc')return (Number(a.rating)||0)-(Number(b.rating)||0);if(sort==='rating-desc')return (Number(b.rating)||0)-(Number(a.rating)||0);if(sort==='characters-desc')return chars(b)-chars(a);if(sort==='characters-asc')return chars(a)-chars(b);return (b.updated||0)-(a.updated||0)});const grid=$('bookGrid');
  grid.innerHTML='';
  const view=localStorage.getItem('qrLibraryView')||'expanded';grid.classList.toggle('compact-view',view==='compact');document.querySelectorAll('[data-library-view]').forEach(button=>{button.classList.toggle('active',button.dataset.libraryView===view);button.setAttribute('aria-pressed',String(button.dataset.libraryView===view))});
- if(!list.length)grid.innerHTML='<div class="empty">No books match this filter.</div>';
+ if(!list.length){
+  const isGallery=state.filter==='gallery';
+  const isEmptyLibrary=!state.books.length;
+  grid.innerHTML=isGallery
+   ? '<div class="empty-state"><span class="empty-icon">▧</span><h2>Your galleries are waiting.</h2><p>Create a gallery or add images to begin.</p></div>'
+   : isEmptyLibrary
+    ? '<div class="empty-state"><span class="empty-icon">▤</span><h2>Your library is waiting.</h2><p>Add to your library to see your stories here.</p></div>'
+    : '<div class="empty">No entries in this category yet.</div>';
+ }
  for(const b of list){
   const card=document.createElement('article');card.className='book-card';
   const pct=b.chapters?.length?Math.round((b.progress?.chapter||0)/b.chapters.length*100):0;const characterCount=(b.chapters||[]).reduce((sum,ch)=>sum+String(ch.text||'').length,0);const rating=Number(b.rating)||0;
