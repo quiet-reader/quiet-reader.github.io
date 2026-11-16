@@ -62,3 +62,26 @@
   .nav-link { padding: 10px 13px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+
+/* Embedded reader workspace */
+.reader-embed-wrap{position:relative;width:100%;height:calc(100vh - 154px);min-height:680px;flex:1;margin:0;overflow:hidden;border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;background:#10141d}
+.reader-engine-frame{display:block;width:100%;height:100%;min-height:680px;border:0;background:#10141d}
+.frame-loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:12px;background:#10141d;pointer-events:none}
+.shell-menu-button{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;color:#aab5c4;background:#151c28;font-size:11px;cursor:pointer}
+.shell-menu-button:hover{border-color:var(--accent);color:var(--accent)}
+.shell-menu-button span{font-size:16px;line-height:1}
+.gallery-page{min-height:60vh}
+.gallery-page .section-heading{margin-bottom:24px}
+.gallery-modal-backdrop{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:#05080dcc;backdrop-filter:blur(8px)}
+.gallery-modal{width:min(520px,100%);padding:25px;border:1px solid #354153;border-radius:15px;background:#151c28;box-shadow:0 24px 80px #0009}
+.gallery-modal-heading{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px}
+.gallery-modal-heading h2{margin:8px 0 0;color:#eef3f8;font:700 20px Manrope,sans-serif}
+.gallery-modal .form-field{display:grid;gap:8px;margin:14px 0;color:#aab5c4;font-size:11px}
+.gallery-modal input{width:100%;padding:11px 12px;border:1px solid #344052;border-radius:8px;color:#e8edf4;background:#101722;font:12px "DM Sans",sans-serif}
+.gallery-modal input[type=file]{padding:10px}
+.gallery-modal .form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+.gallery-modal .primary-button{padding:10px 15px;border:1px solid var(--accent);border-radius:8px;color:#10141d;background:var(--accent);font-size:11px;font-weight:800;cursor:pointer}
+.gallery-modal .secondary-button{padding:10px 15px;border:1px solid #354153;border-radius:8px;color:#c4cedb;background:#1a2230;font-size:11px;cursor:pointer}
+.gallery-modal .form-error{color:#ff9d9d;font-size:11px}
+@media(max-width:760px){.reader-embed-wrap{height:calc(100vh - 142px);min-height:620px}.topbar-note{display:none}.shell-menu-button{padding:7px 9px}}
