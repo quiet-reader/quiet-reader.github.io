@@ -34,7 +34,7 @@ export function createAnnotationEngine(repository: LegacyItemRepository<Annotati
       const item = { ...data, id: globalThis.crypto?.randomUUID?.() ?? `bookmark-${Date.now()}`, createdAt: Date.now() };
       await append(bookId, "bookmarks", item); return item;
     },
-    async addHighlight(bookId: string, data: Omit<HighlightRecord, "id" | "createdAt">): Promise<HighlightRecord> {
+    async addHighlight(bookId: string, data: Pick<HighlightRecord, "chapterId" | "chapterIndex" | "start" | "end" | "text" | "color" | "note">): Promise<HighlightRecord> {
       const item = { ...data, id: globalThis.crypto?.randomUUID?.() ?? `highlight-${Date.now()}`, createdAt: Date.now() };
       await append(bookId, "highlights", item); return item;
     },

@@ -105,7 +105,7 @@ export function AppShell() {
 
   useEffect(() => { void refreshLibrary(); }, []);
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset["theme"] = theme;
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#474747" : theme === "midnight" ? "#171a21" : theme === "forest" ? "#1f2924" : theme === "sepia" ? "#f1e6d1" : theme === "paper" ? "#f2f4f5" : "#f7f7f4");
     try { window.localStorage.setItem("qr-theme", theme); } catch { /* Theme still works for this session. */ }
   }, [theme]);

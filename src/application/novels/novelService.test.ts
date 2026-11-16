@@ -24,7 +24,7 @@ describe("novel service", () => {
     expect(novel.kind).toBe("book");
     expect(novel.chapters).toEqual([]);
     expect(novel.links).toEqual(["https://example.com", "https://example.org"]);
-    expect((await repository.get(novel.id))?.title).toBe("The Quiet Path");
+    expect((await repository.get(novel.id))?.['title']).toBe('The Quiet Path');
   });
 
   it("adds, edits and removes chapters without dropping unknown book fields", async () => {
@@ -35,12 +35,14 @@ describe("novel service", () => {
     await repository.save(withLegacyField);
     const added = await service.addChapter(withLegacyField, "Chapter 1", "Opening text");
     expect(added.chapters).toHaveLength(1);
-    expect(added.legacyExtension).toEqual({ untouched: true });
-    const edited = await service.updateChapter(added, added.chapters[0].id, "Revised Chapter", "Updated text");
-    expect(edited.chapters[0].title).toBe("Revised Chapter");
-    const removed = await service.deleteChapter(edited, added.chapters[0].id);
+    expect(added['legacyExtension']).toEqual({ untouched: true });
+    const addedChapter = added.chapters[0];
+    if (!addedChapter) throw new Error("Expected chapter to be created.");
+    const edited = await service.updateChapter(added, addedChapter.id, "Revised Chapter", "Updated text");
+    expect(edited.chapters[0]?.title).toBe("Revised Chapter");
+    const removed = await service.deleteChapter(edited, addedChapter.id);
     expect(removed.chapters).toHaveLength(0);
-    expect(removed.legacyExtension).toEqual({ untouched: true });
+    expect(removed['legacyExtension']).toEqual({ untouched: true });
   });
 
   it("rejects blank novel and chapter titles", async () => {
