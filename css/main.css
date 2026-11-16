@@ -1038,3 +1038,5 @@ input:focus,textarea:focus,select:focus{outline:2px solid #b9f27c44;border-color
 @media(prefers-reduced-motion:reduce){
  *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}
 }
+
+.drawer-import-note{margin:2px 8px 7px;padding:8px 9px;border-left:2px solid #657b52;background:#1b2631;color:#8795a5;font-size:9px;line-height:1.55}
