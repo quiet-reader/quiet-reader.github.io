@@ -191,38 +191,52 @@ function guessMime(name){
  return ({jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',avif:'image/avif',svg:'image/svg+xml',bmp:'image/bmp',epub:'application/epub+zip',pdf:'application/pdf',txt:'text/plain'})[ext]||'application/octet-stream';
 }
 function safeId(){return uid()}
-async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId){
+async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId,htmlPath=''){
  const doc=new DOMParser().parseFromString(html,'text/html');
- doc.querySelectorAll('script,style,nav,header,footer').forEach(node=>node.remove());
+ doc.querySelectorAll('script,style,nav,header,footer,noscript').forEach(node=>node.remove());
  const images=[];
+ const base=String(htmlPath).split('/').slice(0,-1).join('/');
  for(const img of [...doc.querySelectorAll('img')]){
-  const src=img.getAttribute('src')||'';
-  const filename=decodeURIComponent(src.split(/[?#]/,1)[0].split('/').pop()||'');
-  const match=filename.match(/^([0-9]+)[.]b64[.]png$/i);
-  if(!match)continue;
-  const entry=findZipEntry(zip,name=>name.endsWith('/'+pluginId+'/'+novelId+'/'+chapterId+'/'+filename)||name.endsWith('/'+novelId+'/'+chapterId+'/'+filename));
-  if(entry){
-   // LNReader stores downloaded chapter images beside index.html as numbered PNG files.
-   // Preserve them as local data URLs so the imported chapter is self-contained.
-   const bytes=await entry.async('uint8array');
-   const id=safeId();
-   images.push({id,data:'data:image/png;base64,'+bytesToBase64(bytes),mime:'image/png',name:filename});
+  const src=img.getAttribute('src')||img.getAttribute('data-src')||'';
+  let decoded='';try{decoded=decodeURIComponent(src.split(/[?#]/,1)[0])}catch{decoded=src.split(/[?#]/,1)[0]}
+  const filename=decoded.split('/').pop()||'';
+  if(!filename)continue;
+  const candidates=[base+'/'+decoded.replace(/^\.\//,''),base+'/'+filename];
+  const entry=findZipEntry(zip,name=>{
+   const normalized=name.replace(/^\.\//,'');
+   return candidates.some(path=>normalized===path||normalized.endsWith('/'+path))||
+    (normalized.endsWith('/'+filename)&&normalized.toLowerCase().includes('/'+String(chapterId).toLowerCase()+'/'));
+  });
+  if(entry&&/^image\//i.test(guessMime(filename))){
+   const bytes=await entry.async('uint8array'),mime=guessMime(filename),id=safeId();
+   images.push({id,data:'data:'+mime+';base64,'+bytesToBase64(bytes),mime,name:filename});
    img.replaceWith(doc.createTextNode(String.fromCharCode(10)+'[IMAGE:'+id+']'+String.fromCharCode(10)));
-  }else img.remove();
+  }else if(!src.startsWith('data:image/'))img.remove();
  }
- const blockTags=new Set(['P','DIV','SECTION','ARTICLE','H1','H2','H3','H4','LI','BLOCKQUOTE','BR']);
+ const preferred=doc.querySelector('.chapter-content,.reader-content,.content,#content,[class*="chapter-content"],[class*="reader-content"]')||doc.body;
+ const blockTags=new Set(['P','DIV','SECTION','ARTICLE','H1','H2','H3','H4','H5','H6','LI','BLOCKQUOTE','BR','TR']);
  const walk=node=>{
   if(node.nodeType===Node.TEXT_NODE)return node.nodeValue||'';
   if(node.nodeType!==Node.ELEMENT_NODE)return '';
-  const tag=node.tagName;
-  if(tag==='BR')return String.fromCharCode(10);
+  const tag=node.tagName;if(tag==='BR')return String.fromCharCode(10);
   const inner=[...node.childNodes].map(walk).join('');
-  const separator=String.fromCharCode(10).repeat(2);
-  return blockTags.has(tag)?separator+inner+separator:inner;
+  return blockTags.has(tag)?String.fromCharCode(10).repeat(2)+inner+String.fromCharCode(10).repeat(2):inner;
  };
- const rawText=walk(doc.body).split(String.fromCharCode(13)).join('');
- const text=rawText.split(String.fromCharCode(10)).map(line=>line.trim()).join(String.fromCharCode(10)).replaceAll(String.fromCharCode(10).repeat(3),String.fromCharCode(10).repeat(2)).trim();
+ let rawText=walk(preferred);
+ if(!rawText.trim())rawText=preferred.textContent||doc.body?.textContent||'';
+ const text=rawText.replace(/\r/g,'').split('\n').map(line=>line.replace(/[\\t ]+/g,' ').trim()).filter((line,index,lines)=>line||lines[index-1]).join('\n').replace(/\n{3,}/g,'\n\n').trim();
  return {text,images};
+}
+function chapterHtmlEntry(zip,pluginId,novelId,chapter){
+ const id=String(chapter.id??''),plugin=String(pluginId||'local'),novel=String(novelId||'');
+ const all=zipFiles(zip).filter(entry=>/\/index\.html?$/i.test('/'+entry.name.replace(/\\/g,'/')));
+ const exact=all.find(entry=>{const path='/'+entry.name.replace(/\\/g,'/');return path.endsWith('/'+plugin+'/'+novel+'/'+id+'/index.html')||path.endsWith('/'+novel+'/'+id+'/index.html')});
+ if(exact)return exact;
+ const byId=all.filter(entry=>('/'+entry.name.replace(/\\/g,'/')+'/').toLowerCase().includes('/'+id.toLowerCase()+'/'));
+ if(byId.length===1)return byId[0];
+ const chapterPath=String(chapter.path||'').replace(/^\/+|\/+$/g,'');
+ if(chapterPath){const byPath=all.find(entry=>entry.name.replace(/\\/g,'/').toLowerCase().includes(chapterPath.toLowerCase()));if(byPath)return byPath}
+ return null;
 }
 async function readLNReaderArchive(file){
  const outer=await JSZip.loadAsync(file);
@@ -252,17 +266,20 @@ async function readLNReaderArchive(file){
   book.tags=[...new Set([...tags,...novelCategories])];
   book.lnReader={pluginId,originalId:id,path:String(novel.path||''),status:novel.status||'',artist:novel.artist||'',source:'LNReader'};
   if(typeof novel.cover==='string'&&(novel.cover.startsWith('https://')||novel.cover.startsWith('http://')))book.cover=novel.cover;
-  else if(novel.cover){
-   const cover=findZipEntry(dataZip,name=>name==='Covers/'+id||name.endsWith('/Covers/'+id)||name==='Covers/'+id+'.png'||name.endsWith('/Covers/'+id+'.png'));
-   if(cover){const bytes=await cover.async('uint8array');book.cover='data:image/png;base64,'+bytesToBase64(bytes)}
+  else{
+   const coverNames=[String(novel.cover||''),String(id),String(id)+'.png',String(id)+'.jpg','cover','cover.png','cover.jpg'];
+   const cover=findZipEntry(dataZip,name=>coverNames.some(value=>value&&name.toLowerCase().endsWith('/covers/'+value.toLowerCase())||value&&name.toLowerCase().endsWith('/'+value.toLowerCase())))||
+    (novelFiles&&findZipEntry(novelFiles,name=>name.toLowerCase().includes('/'+pluginId.toLowerCase()+'/'+id.toLowerCase()+'/')&&/(^|\/)cover\.(png|jpe?g|webp)$/i.test(name)))||
+    findZipEntry(outer,name=>/(^|\/)cover\.(png|jpe?g|webp)$/i.test(name)&&name.toLowerCase().includes(String(id).toLowerCase()));
+   if(cover){const bytes=await cover.async('uint8array'),mime=guessMime(cover.name);book.cover='data:'+mime+';base64,'+bytesToBase64(bytes)}
   }
   const readChapters=novel.chapters.map((chapter,index)=>({chapter,index})).sort((a,b)=>(Number(a.chapter.position??a.index)-Number(b.chapter.position??b.index)));
   let lastReadIndex=-1,lastReadAt=0;book.readingHistory=[];
   for(const {chapter,index} of readChapters){
    let text='',images=[];
-   if(novelFiles&&chapter.isDownloaded){
-    const htmlEntry=findZipEntry(novelFiles,name=>name.endsWith('/'+pluginId+'/'+id+'/'+chapter.id+'/index.html')||name.endsWith('/'+id+'/'+chapter.id+'/index.html'));
-    if(htmlEntry){try{const decoded=await decodeHtmlChapter(await htmlEntry.async('string'),novelFiles,pluginId,id,chapter.id);text=decoded.text;images=decoded.images}catch(error){console.warn('LNReader chapter import failed',chapter.name,error)}}
+   if(novelFiles){
+    const htmlEntry=chapterHtmlEntry(novelFiles,pluginId,id,chapter);
+    if(htmlEntry){try{const decoded=await decodeHtmlChapter(await htmlEntry.async('string'),novelFiles,pluginId,id,chapter.id,htmlEntry.name);text=decoded.text;images=decoded.images}catch(error){console.warn('LNReader chapter import failed',chapter.name,error)}}
    }
    const chapterIndex=book.chapters.length;
    const now=Date.now();
