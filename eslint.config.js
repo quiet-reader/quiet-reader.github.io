@@ -21,4 +21,8 @@ export default tseslint.config(
     files: ["vite.config.ts", "eslint.config.js"],
     languageOptions: { globals: { ...globals.node, ...globals.es2022 } },
   },
+  {
+    files: ["public/service-worker.js"],
+    languageOptions: { globals: { ...globals.serviceworker, ...globals.es2022 } },
+  },
 );
