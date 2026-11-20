@@ -62,19 +62,19 @@ function renderBookDetailToggle(collapsed){
  button.setAttribute('aria-label',collapsed?'Expand details':'Collapse details');
  button.title=collapsed?'Expand details':'Collapse details';
 }
-function readColorHistory(key){
- try{return JSON.parse(localStorage.getItem(key)||'[]').filter(value=>/^#[0-9a-f]{6}$/i.test(value)).slice(0,10)}catch{return []}
+function readColorHistory(key,allowAlpha=false){
+ try{return JSON.parse(localStorage.getItem(key)||'[]').filter(value=>allowAlpha?/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(value):/^#[0-9a-f]{6}$/i.test(value)).slice(0,10)}catch{return []}
 }
 function colorHistoryMarkup(key,kind){
- const colors=readColorHistory(key);
+ const colors=readColorHistory(key,kind==='background');
  return '<div class="color-history" aria-label="Recently selected colors">'+(colors.length?colors.map(color=>'<button type="button" class="color-history-chip" data-history-'+kind+'="'+color+'" style="--history-color:'+color+'" title="'+color+'" aria-label="Use '+color+'"></button>').join(''):'<span class="muted tiny">Your last 10 selected colors will appear here.</span>')+'</div>';
 }
 function appearanceModal(){
  const themes=[['default','Quiet grey','Soft neutral grey'],['dark','Deep dark','Charcoal'],['midnight','Midnight','Blue-black'],['ocean','Ocean','Deep teal'],['forest','Forest','Green-black'],['plum','Plum','Dark violet'],['sepia','Sepia','Warm paper'],['light','Light','Bright neutral']];
  const current=localStorage.getItem('qbtheme')||'default';
- const themeBackgrounds={default:'#474747',dark:'#10141b',midnight:'#090e18',ocean:'#0b1820',forest:'#101b17',plum:'#19131f',sepia:'#eee2ce',light:'#f4f6f8'};
+ const themeBackgrounds={default:'#47474747',dark:'#10141b',midnight:'#090e18',ocean:'#0b1820',forest:'#101b17',plum:'#19131f',sepia:'#eee2ce',light:'#f4f6f8'};
  const activeAccent=localStorage.getItem('qrAccent')||getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#b9f27c';
- const activeBackground=localStorage.getItem('qrBackground')||themeBackgrounds[current]||'#474747';
+ const activeBackground=(localStorage.getItem('qrBackground')||themeBackgrounds[current]||'#47474747').slice(0,7);
  const activeText=localStorage.getItem('qrTextColor')||getComputedStyle(document.documentElement).getPropertyValue('--fg').trim()||'#eeeeee';
  const rows=themes.map(([id,name,detail])=>'<button type="button" class="appearance-option '+(id===current?'active':'')+'" data-appearance-theme="'+id+'"><span class="appearance-swatch appearance-swatch-'+id+'"></span><span class="appearance-option-copy"><b>'+name+'</b><small>'+detail+'</small></span><span class="appearance-option-check">'+(id===current?'✓':'')+'</span></button>').join('');
  const accents=['#b9f27c','#8be9fd','#63d8c5','#a3e6a0','#d6a5f5','#f0a6b8','#f2c66d','#ffffff'];
@@ -93,7 +93,7 @@ function appearanceModal(){
   };
   host.onclick=e=>{
    const tab=e.target.closest('[data-appearance-tab]');if(tab){host.querySelectorAll('[data-appearance-tab]').forEach(x=>x.classList.toggle('active',x===tab));host.querySelectorAll('[data-appearance-pane]').forEach(x=>x.classList.toggle('hidden',x.dataset.appearancePane!==tab.dataset.appearanceTab));return}
-   const option=e.target.closest('[data-appearance-theme]');if(option){applyTheme(option.dataset.appearanceTheme);host.querySelectorAll('[data-appearance-theme]').forEach(x=>{x.classList.toggle('active',x===option);x.querySelector('.appearance-option-check').textContent=x===option?'✓':''});$('customBackgroundColor').value=localStorage.getItem('qrBackground')||themeBackgrounds[option.dataset.appearanceTheme];$('customTextColor').value=localStorage.getItem('qrTextColor')||getComputedStyle(document.documentElement).getPropertyValue('--fg').trim();$('customAccentColor').value=localStorage.getItem('qrAccent')||getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()}
+   const option=e.target.closest('[data-appearance-theme]');if(option){applyTheme(option.dataset.appearanceTheme);host.querySelectorAll('[data-appearance-theme]').forEach(x=>{x.classList.toggle('active',x===option);x.querySelector('.appearance-option-check').textContent=x===option?'✓':''});$('customBackgroundColor').value=(localStorage.getItem('qrBackground')||themeBackgrounds[option.dataset.appearanceTheme]).slice(0,7);$('customTextColor').value=localStorage.getItem('qrTextColor')||getComputedStyle(document.documentElement).getPropertyValue('--fg').trim();$('customAccentColor').value=localStorage.getItem('qrAccent')||getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()}
    const chip=e.target.closest('[data-accent]');if(chip){applyAccent(chip.dataset.accent);$('customAccentColor').value=chip.dataset.accent;renderHistories()}
    const accentHistory=e.target.closest('[data-history-accent]');if(accentHistory){applyAccent(accentHistory.dataset.historyAccent);$('customAccentColor').value=accentHistory.dataset.historyAccent;renderHistories()}
    const backgroundHistory=e.target.closest('[data-history-background]');if(backgroundHistory){applyBackground(backgroundHistory.dataset.historyBackground);$('customBackgroundColor').value=backgroundHistory.dataset.historyBackground;renderHistories()}
