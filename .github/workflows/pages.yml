@@ -37,7 +37,7 @@ jobs:
           APP_COMMIT="${GITHUB_SHA::7}"
           APP_SHELL=$(grep -o "quiet-reader-shell-v[0-9]*" service-worker.js | head -1)
           mkdir -p public
-          node -e 'const fs=require("fs");const [version,commit,shell]=process.argv.slice(1);fs.writeFileSync("public/version.json",JSON.stringify({version,commit,shell,builtAt:new Date().toISOString()},null,2)+"\\n")' "$APP_VERSION" "$APP_COMMIT" "$APP_SHELL"
+          node -e 'const fs=require("fs");const [version,commit,shell]=process.argv.slice(1);fs.writeFileSync("public/version.json",JSON.stringify({version,commit,shell,builtAt:new Date().toISOString()},null,2))' "$APP_VERSION" "$APP_COMMIT" "$APP_SHELL"
           echo "VITE_APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
           echo "VITE_APP_COMMIT=$APP_COMMIT" >> "$GITHUB_ENV"
           echo "VITE_APP_SHELL=$APP_SHELL" >> "$GITHUB_ENV"
