@@ -369,6 +369,29 @@ async function finishKokoroChapter(){
   toast('Reached the end of the novel');
  }
 }
+function scheduleVisualAutoReadSentence(){
+ const node=autoReadNodes()[autoReadIndex];
+ if(!node){advanceAutoRead();return}
+ const source=(node.innerText||'').trim(),sentences=splitSpeechSentences(source);
+ if(!source||!sentences.length){advanceAutoRead();return}
+ let cursor=0,selected=null,selectedStart=0;
+ for(const sentence of sentences){
+  const at=source.indexOf(sentence,cursor);
+  const start=at<0?cursor:at;
+  cursor=start+sentence.length;
+  if(cursor>autoReadCharOffset){selected=sentence;selectedStart=start;break}
+ }
+ if(!selected){advanceAutoRead();return}
+ autoReadCharOffset=selectedStart;
+ highlightAutoReadSentence(selected);
+ const charsPerMinute=autoReadCharsPerMinute(Number($('autoReadSpeed')?.value||55));
+ const delay=Math.max(100,Math.min(60000,selected.length/charsPerMinute*60000));
+ autoReadTimer=setTimeout(()=>{
+  if(!autoReadRunning||autoReadPaused)return;
+  autoReadCharOffset=selectedStart+selected.length;
+  scheduleVisualAutoReadSentence();
+ },delay);
+}
 function scheduleAutoRead(){
  clearTimeout(autoReadTimer);
  if(!autoReadRunning||autoReadPaused)return;
@@ -377,12 +400,8 @@ function scheduleAutoRead(){
  if($('ttsEnabled')?.checked&&$('ttsEngine')?.value==='kokoro'){speakCurrentKokoroSentence();return}
  highlightAutoReadParagraph();
  if(speakCurrentParagraph())return;
- setTTSStatus($('ttsEnabled')?.checked?'TTS voice not ready · focus mode active':'Focus mode active · TTS off');
- const speed=Number($('autoReadSpeed')?.value||55);
- const chars=(nodes[autoReadIndex].innerText||'').length;
- const charsPerMinute=autoReadCharsPerMinute(speed);
- const delay=Math.max(80,Math.min(60000,chars/charsPerMinute*60000));
- autoReadTimer=setTimeout(advanceAutoRead,delay);
+ setTTSStatus($('ttsEnabled')?.checked?'TTS voice not ready · visual focus active':'Visual auto-read active · TTS off');
+ scheduleVisualAutoReadSentence();
 }
 async function advanceAutoRead(){
  if(!autoReadRunning||autoReadPaused)return;
