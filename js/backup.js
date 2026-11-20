@@ -378,7 +378,7 @@ function showLNReaderPreflight(file,report,source=file){
  const html='<div class="stack"><p class="muted tiny">Preflight inspection only. Nothing has been added to your library yet.</p><div class="modal-item"><b>Archive</b><p>'+esc(file.name||'LN Reader backup')+' · '+readableSize(report.size)+'</p><p>'+report.outerCount+' outer entries · '+report.dataCount+' data entries · '+report.downloadCount+' downloaded entries</p></div><div class="modal-item"><b>Detected content</b><p>'+report.novelRecords.length+' novels · '+report.chapters+' chapter records · '+report.categories.length+' categories</p><p>'+(categoryNames.length?categoryNames.map(esc).join(', '):'No categories found')+'</p></div><div class="modal-item"><b>Settings and app metadata</b><ul class="tiny">'+settings+'</ul></div><div class="modal-item"><b>Verification notes</b>'+missing+'</div><p class="muted tiny">This inspection verifies archive structure and readable metadata JSON. It does not yet validate every chapter payload or image byte. Keep the original backup unchanged.</p><div class="row"><span class="grow"></span><button type="button" id="cancelLNReaderPreflight">Cancel</button><button type="button" class="primary" id="confirmLNReaderPreflight" '+(!report.novelRecords.length?'disabled':'')+'>Import detected content</button></div></div>';
  modal('Review LN Reader backup',html,()=>{$('cancelLNReaderPreflight').onclick=closeModal;$('confirmLNReaderPreflight').onclick=()=>{closeModal();void importBackup(source,{prepared:report})}});
 }
-async function readLNReaderArchive(file,prepared){
+async function readLNReaderArchive(file,prepared,onBook){
  const dataZip=prepared?.dataZip;
  if(!dataZip)throw new Error('This is not a recognised LN Reader archive or extracted backup folder.');
  const novelEntries=prepared?.novelEntries||[];
@@ -386,7 +386,7 @@ async function readLNReaderArchive(file,prepared){
  const categoryNames=new Map(categories.map(category=>[Number(category.id),String(category.name||'').trim()]).filter(([,name])=>name));
  const downloadZip=prepared?.downloadZip||dataZip;
  const novelRecords=prepared?.novelRecords||[];
- const items=[];
+ const items=[];let importedBooks=0,totalChapters=0,readableChapters=0;
  for(const record of novelRecords.length?novelRecords:novelEntries.map(entry=>({entry,novel:null}))){
   const entry=record.entry;let novel=record.novel;
   if(!novel){try{novel=JSON.parse(await entry.async('string'))}catch{continue}}
@@ -431,12 +431,14 @@ async function readLNReaderArchive(file,prepared){
    });
    if(chapter.bookmark)book.bookmarks.push({id:safeId(),chapter:chapterIndex,offset:0,text:String(chapter.name||'Chapter '+(position+1)),created:now});
   }
-  book.progress={chapter:Math.max(0,lastReadIndex),offset:0};book.readingHistory=book.readingHistory.slice(-100);book.updated=Date.now();items.push(book);
+  book.progress={chapter:Math.max(0,lastReadIndex),offset:0};book.readingHistory=book.readingHistory.slice(-100);book.updated=Date.now();
+  totalChapters+=book.chapters.length;readableChapters+=book.chapters.filter(chapter=>String(chapter.text||'').trim()).length;
+  if(onBook){await onBook(book);items.push({id:book.id,kind:'book'});importedBooks++;if(importedBooks%3===0)toast('LN Reader import · '+importedBooks+' novels saved');await new Promise(resolve=>setTimeout(resolve,0))}else{items.push(book);importedBooks++}
  }
- if(!items.length)throw new Error('No readable novels were found in this LNReader backup.');
- // LNReader categories are converted into each book's normal tags. Do not inject them
- // into the app-wide custom-category registry, which has a separate lifecycle.
- return {items,theme:null,preferences:null,source:'lnreader-zip'};
+ if(!importedBooks)throw new Error('No readable novels were found in this LNReader backup.');
+ // Persist each completed novel before moving on, so the importer does not retain every
+ // novel and its decoded images in RAM until the entire archive finishes.
+ return {items,theme:null,preferences:null,source:'lnreader-zip',persisted:Boolean(onBook),stats:{books:importedBooks,chapters:totalChapters,readable:readableChapters}};
 }
 function parseLNReaderJson(data){
  const candidates=[Array.isArray(data)?data:undefined,data?.novels,data?.library?.novels,data?.data?.novels,data?.backup?.novels,data?.items];
@@ -552,23 +554,22 @@ export async function importBackup(file,options={}){
    }else{
     const prepared=options.prepared||await inspectLNReaderSources(sources);
     if(!options.prepared){showLNReaderPreflight(first,prepared,sources);return}
-    restored=await readLNReaderArchive(sources,prepared);
+    restored=await readLNReaderArchive(sources,prepared,put);
    }
   }else{
    const parsed=JSON.parse(await first.text());
    try{restored=parseLegacyBackup(parsed)}catch{restored=parseLNReaderJson(parsed)}
   }
-  if(!Array.isArray(restored.items)||restored.items.some(item=>!item||!item.id||!['book','paste'].includes(item.kind)))throw new Error('The backup contains an invalid book or paste record.');
-  // Validate the complete restore before writing; putMany commits all entries together.
-  await putMany(restored.items);
+  if(!restored.persisted&&(!Array.isArray(restored.items)||restored.items.some(item=>!item||!item.id||!['book','paste'].includes(item.kind))))throw new Error('The backup contains an invalid book or paste record.');
+  // LN Reader novels are committed one at a time to bound peak memory. Other backups
+  // retain the existing all-at-once validation and write path.
+  if(!restored.persisted)await putMany(restored.items);
   applyPreferences(restored);
   if(restored.source==='lnreader-json'){
    toast('LNReader 1.x · '+restored.items.length+' novels imported; chapter files and reading progress are not in this backup');
   }else if(restored.source==='lnreader-zip'){
-   const books=restored.items.filter(item=>item.kind==='book');
-   const chapters=books.reduce((sum,book)=>sum+(book.chapters||[]).length,0);
-   const readable=books.reduce((sum,book)=>sum+(book.chapters||[]).filter(chapter=>String(chapter.text||'').trim()).length,0);
-   toast('LNReader imported · '+books.length+' novels · '+chapters+' chapters · '+readable+' with text');
+   const stats=restored.stats||{books:restored.items.length,chapters:0,readable:0};
+   toast('LN Reader imported · '+stats.books+' novels · '+stats.chapters+' chapters · '+stats.readable+' with text');
   }else toast('Backup restored · '+restored.items.length+' entries imported');
   location.reload();
  }catch(error){alert('Could not restore backup: '+(error?.message||error))}
