@@ -315,6 +315,7 @@ function makeFolderArchive(files){
  return {files:entries,file(path){return entries[path]||entries[String(path||'').replace(/\\/g,'/')]||null}};
 }
 function archiveHasNovelMetadata(archive){return zipFiles(archive).some(entry=>normalizedZipPath(entry.name).includes('novelandchapters/')&&/\.json$/i.test(entry.name))}
+function combineArchiveViews(primary,secondary){if(!primary)return secondary;if(!secondary||primary===secondary)return primary;const files=Object.assign(Object.create(null),primary.files||{},secondary.files||{});return {files,file(path){return files[path]||files[String(path||'').replace(/\\/g,'/')]||null}}}
 function fallbackNovelRecords(archive){
  const groups=new Map();
  for(const entry of zipFiles(archive)){
@@ -365,22 +366,23 @@ async function inspectLNReaderSources(source){
  for(const entry of novelEntries){try{const novel=JSON.parse(await entry.async('string'));if(novel&&typeof novel==='object'&&Array.isArray(novel.chapters))novelRecords.push({entry,novel})}catch{}}
  if(!novelRecords.length){for(const entry of dataFiles.filter(entry=>/\.json$/i.test(entry.name)&&/(novels?|novel-files)/i.test(entry.name))){try{const novel=JSON.parse(await entry.async('string'));if(novel&&typeof novel==='object'&&Array.isArray(novel.chapters))novelRecords.push({entry,novel})}catch{}}}
  if(!novelRecords.length){for(const entry of dataFiles.filter(entry=>/\.json$/i.test(entry.name))){try{const value=JSON.parse(await entry.async('string')),list=[value?.novels,value?.library?.novels,value?.data?.novels,value?.backup?.novels].find(Array.isArray);if(list)for(const novel of list)if(novel&&typeof novel==='object'&&Array.isArray(novel.chapters))novelRecords.push({entry,novel})}catch{}}}
- let fallback=false;if(!novelRecords.length){const generated=fallbackNovelRecords(downloadZip);if(generated.length){novelRecords.push(...generated);fallback=true}}
+ const chapterArchive=combineArchiveViews(dataZip,downloadZip);
+ let fallback=false;if(!novelRecords.length){let generated=fallbackNovelRecords(chapterArchive);if(!generated.length&&chapterArchive!==dataZip)generated=fallbackNovelRecords(dataZip);if(generated.length){novelRecords.push(...generated);fallback=true}}
  const categoryEntry=findZipEntry(dataZip,name=>pathParts(name).at(-1)==='category.json')||archives.map(item=>findZipEntry(item.archive,name=>pathParts(name).at(-1)==='category.json')).find(Boolean);let categories=[];
- if(categoryEntry){try{const parsed=JSON.parse(await categoryEntry.async('string'));categories=Array.isArray(parsed)?parsed:[]}catch{}}
+ if(categoryEntry){try{const parsed=JSON.parse(await categoryEntry.async('string'));categories=Array.isArray(parsed)?parsed:Array.isArray(parsed?.categories)?parsed.categories:[]}catch{}}
  const chapters=novelRecords.reduce((sum,record)=>sum+record.novel.chapters.length,0),missing=[];
  if(!novelRecords.length)missing.push('No novel detail JSON or recognizable numbered chapter folders were found; no novels can be safely created');
  if(categoryEntry&&!categories.length)missing.push('category.json exists but is empty or could not be parsed; no category subcategories will be created');
  if(fallback)missing.push('Novel detail JSON is missing; titles and chapter order will be reconstructed from folder names and chapter indexes');
  if(!categoryEntry)missing.push('category.json (LN Reader category subcategories will not be created)');
- const payloadCount=zipFiles(downloadZip).filter(entry=>/\.(html?|png|jpe?g|webp|gif|avif|bmp)$/i.test(entry.name)||(/\.json$/i.test(entry.name)&&!normalizedZipPath(entry.name).includes('novelandchapters/')&&!/category\.json$/i.test(entry.name))).length;
+ const payloadCount=zipFiles(chapterArchive).filter(entry=>/\.(html?|png|jpe?g|webp|gif|avif|bmp)$/i.test(entry.name)||(/\.json$/i.test(entry.name)&&!normalizedZipPath(entry.name).includes('novelandchapters/')&&!/category\.json$/i.test(entry.name))).length;
  if(!payloadCount)missing.push('No downloaded chapter HTML, JSON, or image payloads were detected; chapter text may be unavailable');
  const metadataEntries=[...archives.flatMap(item=>zipFiles(item.archive)),...dataFiles,...zipFiles(downloadZip)].filter(entry=>/\.json$/i.test(entry.name)&&/(app|preference|setting|plugin|version|config|category|metadata)/i.test(entry.name));
  const settingsFiles=[];
  for(const entry of metadataEntries){try{const value=JSON.parse(await entry.async('string'));const keys=value&&typeof value==='object'&&!Array.isArray(value)?Object.keys(value).slice(0,24):Array.isArray(value)?['Array · '+value.length+' items']:[typeof value];settingsFiles.push(entry.name+(keys.length?' · '+keys.join(', '):' · empty JSON'))}catch{settingsFiles.push(entry.name+' · invalid JSON')}}
  const uniqueArchives=[...new Set([...archives.map(item=>item.archive),dataZip,downloadZip].filter(Boolean))];
  const size=sources.reduce((sum,file)=>sum+(Number(file.size)||0),0),expandedSize=uniqueArchives.reduce((sum,archive)=>sum+estimateExpandedSize(archive),0),folderCount=uniqueArchives.reduce((sum,archive)=>sum+countArchiveFolders(archive),0);
- return {dataZip,downloadZip,novelEntries,novelRecords,categories,categoryEntry,settingsFiles:[...new Set(settingsFiles)],chapters,outerCount:archives.reduce((sum,item)=>sum+zipFiles(item.archive).length,0),folderCount,dataCount:dataFiles.length,downloadCount:zipFiles(downloadZip).length,missing,size,expandedSize,fallback,sourceLabel:sources.length===1?(folderInputs.length?'Extracted folder':sources[0].name||'LN Reader backup'):sources.length+' selected files'};
+ return {dataZip,downloadZip,chapterArchive,novelEntries,novelRecords,categories,categoryEntry,settingsFiles:[...new Set(settingsFiles)],chapters,outerCount:archives.reduce((sum,item)=>sum+zipFiles(item.archive).length,0),folderCount,dataCount:dataFiles.length,downloadCount:zipFiles(downloadZip).length,missing,size,expandedSize,fallback,sourceLabel:sources.length===1?(folderInputs.length?'Extracted folder':sources[0].name||'LN Reader backup'):sources.length+' selected files'};
 }
 function countArchiveFolders(archive){const folders=new Set();for(const entry of zipFiles(archive)){const parts=pathParts(entry.name);for(let i=1;i<parts.length;i++)folders.add(parts.slice(0,i).join('/'))}return folders.size}
 function showLNReaderJsonPreflight(file,parsed,restored){
@@ -404,7 +406,7 @@ async function readLNReaderArchive(file,prepared,onBook){
  const novelEntries=prepared?.novelEntries||[];
  const categories=prepared?.categories||[];
  const categoryNames=new Map(categories.map(category=>[Number(category.id),String(category.name||'').trim()]).filter(([,name])=>name));
- const downloadZip=prepared?.downloadZip||dataZip;
+ const downloadZip=prepared?.chapterArchive||prepared?.downloadZip||dataZip;
  const novelRecords=prepared?.novelRecords||[];
  const items=[];let importedBooks=0,totalChapters=0,readableChapters=0;
  for(const record of novelRecords.length?novelRecords:novelEntries.map(entry=>({entry,novel:null}))){
