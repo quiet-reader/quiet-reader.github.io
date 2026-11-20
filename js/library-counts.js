@@ -1,6 +1,6 @@
 import {getAll} from './db.js';
 
-const filterNames={all:'All entries',epub:'EPUB',manhwa:'Manhwa',pdf:'PDF',manual:'Novels',gallery:'Galleries'};
+const filterNames={all:'All entries',epub:'EPUB',manhwa:'Manhwa',pdf:'PDF',manual:'Novels',gallery:'Galleries',lnreader:'LN Reader'};
 let updateSequence=0;
 let scheduled=false;
 function matchesSearch(book,query,mode){
