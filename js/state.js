@@ -1,5 +1,5 @@
 import {uid} from './utils.js';
-export const state={books:[],pastes:[],book:null,chapter:0,editIndex:null,filter:'all',tagFilter:'all',screen:'library'};
+export const state={books:[],pastes:[],book:null,chapter:0,editIndex:null,filter:'all',tagFilter:'all',lnReaderCategory:'all',screen:'library'};
 export function freshBook(source,title){return{id:uid(),kind:'book',source,title,author:'',cover:'',createdAt:Date.now(),chapters:[],locked:false,bookmarks:[],highlights:[],progress:{chapter:0,offset:0},updated:Date.now()}}
 let readerViewportSnapshot=null;
 let bookViewportSnapshot=null;
