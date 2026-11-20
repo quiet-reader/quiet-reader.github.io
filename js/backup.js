@@ -381,6 +381,13 @@ async function inspectLNReaderSources(source){
  return {outer,dataZip,downloadZip,novelEntries,novelRecords,categories,categoryEntry,settingsFiles:[...new Set(settingsFiles)],chapters,outerCount:archives.reduce((sum,item)=>sum+zipFiles(item.archive).length,0),folderCount,dataCount:dataFiles.length,downloadCount:zipFiles(downloadZip).length,missing,size,expandedSize,fallback,sourceLabel:sources.length===1?(folderInputs.length?'Extracted folder':sources[0].name||'LN Reader backup'):sources.length+' selected files'};
 }
 function countArchiveFolders(archive){const folders=new Set();for(const entry of zipFiles(archive)){const parts=pathParts(entry.name);for(let i=1;i<parts.length;i++)folders.add(parts.slice(0,i).join('/'))}return folders.size}
+function showLNReaderJsonPreflight(file,parsed,restored){
+ const books=restored.items.filter(item=>item.kind==='book'),chapters=books.reduce((sum,book)=>sum+(book.chapters||[]).length,0);
+ const categories=parsed.categories||parsed.library?.categories||[],categoryNames=categories.map(category=>String(category.name||'').trim()).filter(Boolean);
+ const keys=Object.keys(parsed||{}).map(key=>'<li>'+esc(key)+'</li>').join('');
+ const html='<div class="stack"><p class="muted tiny">Preflight inspection only. Nothing has been added to your library yet.</p><div class="modal-item"><b>JSON backup</b><p>'+esc(file.name||'LN Reader JSON')+' · '+readableSize(Number(file.size)||0)+'</p><p>'+books.length+' novels · '+chapters+' chapter records · '+categories.length+' categories</p></div><div class="modal-item"><b>Detected categories</b><p>'+(categoryNames.length?categoryNames.map(esc).join(', '):'No categories included')+'</p></div><div class="modal-item"><b>Top-level JSON fields</b><ul class="tiny">'+keys+'</ul></div><p class="muted tiny">Native LN Reader 1.x JSON contains novel details only; downloaded chapter files and reading progress may not be included.</p><div class="row"><span class="grow"></span><button type="button" id="cancelLNReaderJsonPreflight">Cancel</button><button type="button" class="primary" id="confirmLNReaderJsonPreflight">Import detected content</button></div></div>';
+ modal('Review LN Reader JSON',html,()=>{$('cancelLNReaderJsonPreflight').onclick=closeModal;$('confirmLNReaderJsonPreflight').onclick=()=>{closeModal();void importBackup(file,{jsonPrepared:restored})}});
+}
 function showLNReaderPreflight(file,report,source=file){
  const categoryNames=report.categories.map(category=>String(category.name||'').trim()).filter(Boolean);
  const settings=report.settingsFiles.length?report.settingsFiles.map(name=>'<li>'+esc(name)+'</li>').join(''):'<li>No settings, plugin settings, or version JSON detected</li>';
@@ -568,9 +575,10 @@ export async function importBackup(file,options={}){
     if(!options.prepared){showLNReaderPreflight(first,prepared,sources);return}
     restored=await readLNReaderArchive(sources,prepared,put);
    }
-  }else{
+  }else if(options.jsonPrepared){restored=options.jsonPrepared}
+  else{
    const parsed=JSON.parse(await first.text());
-   try{restored=parseLegacyBackup(parsed)}catch{restored=parseLNReaderJson(parsed)}
+   try{restored=parseLegacyBackup(parsed)}catch{restored=parseLNReaderJson(parsed);showLNReaderJsonPreflight(first,parsed,restored);return}
   }
   if(!restored.persisted&&(!Array.isArray(restored.items)||restored.items.some(item=>!item||!item.id||!['book','paste'].includes(item.kind))))throw new Error('The backup contains an invalid book or paste record.');
   // LN Reader novels are committed one at a time to bound peak memory. Other backups
