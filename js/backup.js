@@ -233,7 +233,7 @@ async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId,htmlPath=''
 }
 function chapterHtmlEntry(zip,pluginId,novelId,chapter){
  const id=String(chapter.id??''),plugin=String(pluginId||'local'),novel=String(novelId||'');
- const all=zipPathIndex(zip).htmlFiles.filter(entry=>/\/index\.html?$/i.test('/'+entry.name.replace(/\\/g,'/')));
+ const all=(zipPathIndex(zip).bySegment.get(id.toLowerCase())||[]).filter(entry=>/\/index\.html?$/i.test('/'+entry.name.replace(/\\/g,'/')));
  const exact=all.find(entry=>{const path='/'+entry.name.replace(/\\/g,'/');return path.endsWith('/'+plugin+'/'+novel+'/'+id+'/index.html')||path.endsWith('/'+novel+'/'+id+'/index.html')});
  if(exact)return exact;
  const byId=all.filter(entry=>('/'+entry.name.replace(/\\/g,'/')+'/').toLowerCase().includes('/'+id.toLowerCase()+'/'));
@@ -300,7 +300,8 @@ async function readDownloadedChapter(downloadZip,pluginId,novelId,chapter,index)
  return {text,images};
 }
 const lnReaderPreparedCache=new WeakMap();
-function readableSize(bytes){if(bytes<1024)return bytes+' B';if(bytes<1048576)return (bytes/1024).toFixed(1)+' KB';return (bytes/1048576).toFixed(2)+' MB'}
+function readableSize(bytes){if(bytes<1024)return bytes+' B';if(bytes<1048576)return (bytes/1024).toFixed(1)+' KB';if(bytes<1073741824)return (bytes/1048576).toFixed(2)+' MB';return (bytes/1073741824).toFixed(2)+' GB'}
+function estimateExpandedSize(archive){return zipFiles(archive).reduce((sum,entry)=>sum+(Number(entry._data?.uncompressedSize)||0),0)}
 function makeFolderArchive(files){
  const paths=files.map(file=>String(file.webkitRelativePath||file.name||'').replace(/\\/g,'/').replace(/^\/+/,'' )).filter(Boolean);
  const roots=paths.map(path=>path.split('/')[0]);
@@ -369,15 +370,15 @@ async function inspectLNReaderSources(source){
  if(fallback)missing.push('Novel detail JSON is missing; titles and chapter order will be reconstructed from folder names and chapter indexes');
  if(!categoryEntry)missing.push('category.json (LN Reader category subcategories will not be created)');
  if(downloadZip===dataZip)missing.push('A separate download archive was not detected; chapter text and images may be incomplete');
- const size=sources.reduce((sum,file)=>sum+(Number(file.size)||0),0);
- return {outer,dataZip,downloadZip,novelEntries,novelRecords,categories,categoryEntry,settingsFiles:[...new Set(metadataFiles)],chapters,outerCount:archives.reduce((sum,item)=>sum+zipFiles(item.archive).length,0),folderCount:archives.reduce((sum,item)=>sum+countArchiveFolders(item.archive),0)+countArchiveFolders(dataZip)+(downloadZip!==dataZip?countArchiveFolders(downloadZip):0),dataCount:dataFiles.length,downloadCount:zipFiles(downloadZip).length,missing,size,fallback,sourceLabel:sources.length===1?(folderInputs.length?'Extracted folder':sources[0].name||'LN Reader backup'):sources.length+' selected files'};
+ const size=sources.reduce((sum,file)=>sum+(Number(file.size)||0),0),expandedSize=archives.reduce((sum,item)=>sum+estimateExpandedSize(item.archive),0)+estimateExpandedSize(dataZip)+(downloadZip!==dataZip?estimateExpandedSize(downloadZip):0);
+ return {outer,dataZip,downloadZip,novelEntries,novelRecords,categories,categoryEntry,settingsFiles:[...new Set(metadataFiles)],chapters,outerCount:archives.reduce((sum,item)=>sum+zipFiles(item.archive).length,0),folderCount:archives.reduce((sum,item)=>sum+countArchiveFolders(item.archive),0)+countArchiveFolders(dataZip)+(downloadZip!==dataZip?countArchiveFolders(downloadZip):0),dataCount:dataFiles.length,downloadCount:zipFiles(downloadZip).length,missing,size,expandedSize,fallback,sourceLabel:sources.length===1?(folderInputs.length?'Extracted folder':sources[0].name||'LN Reader backup'):sources.length+' selected files'};
 }
 function countArchiveFolders(archive){const folders=new Set();for(const entry of zipFiles(archive)){const parts=pathParts(entry.name);for(let i=1;i<parts.length;i++)folders.add(parts.slice(0,i).join('/'))}return folders.size}
 function showLNReaderPreflight(file,report,source=file){
  const categoryNames=report.categories.map(category=>String(category.name||'').trim()).filter(Boolean);
  const settings=report.settingsFiles.length?report.settingsFiles.map(name=>'<li>'+esc(name)+'</li>').join(''):'<li>No settings, plugin settings, or version JSON detected</li>';
  const missing=report.missing.length?'<ul class="muted tiny">'+report.missing.map(item=>'<li>'+esc(item)+'</li>').join('')+'</ul>':'<p class="muted tiny">No missing core files detected.</p>';
- const html='<div class="stack"><p class="muted tiny">Preflight inspection only. Nothing has been added to your library yet.</p><div class="modal-item"><b>Archive</b><p>'+esc(report.sourceLabel||file.name||'LN Reader backup')+' · '+readableSize(report.size)+'</p><p>'+report.outerCount+' files · '+report.folderCount+' folders · '+report.dataCount+' data entries · '+report.downloadCount+' downloaded entries</p></div><div class="modal-item"><b>Detected content</b><p>'+report.novelRecords.length+' novels · '+report.chapters+' chapter records · '+report.categories.length+' categories</p><p>'+(categoryNames.length?categoryNames.map(esc).join(', '):'No categories found')+'</p></div><div class="modal-item"><b>Settings and app metadata</b><ul class="tiny">'+settings+'</ul></div><div class="modal-item"><b>Verification notes</b>'+missing+'</div><p class="muted tiny">This inspection checks archive structure, metadata JSON and chapter indexes. Individual chapter payloads and image bytes are decoded during import. Completed novels are saved as they finish, so an interrupted import may leave those completed novels in your library.</p><div class="row"><span class="grow"></span><button type="button" id="cancelLNReaderPreflight">Cancel</button><button type="button" class="primary" id="confirmLNReaderPreflight" '+(!report.novelRecords.length?'disabled':'')+'>Import detected content</button></div></div>';
+ const html='<div class="stack"><p class="muted tiny">Preflight inspection only. Nothing has been added to your library yet.</p><div class="modal-item"><b>Archive</b><p>'+esc(report.sourceLabel||file.name||'LN Reader backup')+' · '+readableSize(report.size)+' compressed · approx. '+readableSize(report.expandedSize)+' expanded+'</p><p>'+report.outerCount+' files · '+report.folderCount+' folders · '+report.dataCount+' data entries · '+report.downloadCount+' downloaded entries</p></div><div class="modal-item"><b>Detected content</b><p>'+report.novelRecords.length+' novels · '+report.chapters+' chapter records · '+report.categories.length+' categories</p><p>'+(categoryNames.length?categoryNames.map(esc).join(', '):'No categories found')+'</p></div><div class="modal-item"><b>Settings and app metadata</b><ul class="tiny">'+settings+'</ul></div><div class="modal-item"><b>Verification notes</b>'+missing+'</div><p class="muted tiny">This inspection checks archive structure, metadata JSON and chapter indexes. Individual chapter payloads and image bytes are decoded during import. Completed novels are saved as they finish, so an interrupted import may leave those completed novels in your library.</p><div class="row"><span class="grow"></span><button type="button" id="cancelLNReaderPreflight">Cancel</button><button type="button" class="primary" id="confirmLNReaderPreflight" '+(!report.novelRecords.length?'disabled':'')+'>Import detected content</button></div></div>';
  modal('Review LN Reader backup',html,()=>{$('cancelLNReaderPreflight').onclick=closeModal;$('confirmLNReaderPreflight').onclick=()=>{closeModal();void importBackup(source,{prepared:report})}});
 }
 async function readLNReaderArchive(file,prepared,onBook){
@@ -417,6 +418,7 @@ async function readLNReaderArchive(file,prepared,onBook){
   for(let position=0;position<ordered.length;position++){
    const {chapter,index}=ordered[position];
    const decoded=await readDownloadedChapter(downloadZip,pluginId,id,chapter,position);
+   if(position&&position%12===0)await new Promise(resolve=>setTimeout(resolve,0));
    let text=decoded.text,images=decoded.images;
    if(!text&&downloadZip){
     const html=chapterHtmlEntry(downloadZip,pluginId,id,chapter);
