@@ -336,7 +336,7 @@ function fallbackNovelRecords(archive){
 }
 async function inspectLNReaderSources(source){
  if(!window.JSZip)throw new Error('The ZIP library did not load. Check your connection and retry.');
- const sources=Array.isArray(source)?source:[source],zipInputs=sources.filter(file=>/\.zip$/i.test(file.name||'')||/zip/i.test(file.type||'')),folderInputs=sources.filter(file=>file.webkitRelativePath);
+ const sources=Array.isArray(source)?source:[source],zipInputs=sources.filter(file=>!file.webkitRelativePath&&(/\.zip$/i.test(file.name||'')||/zip/i.test(file.type||''))),folderInputs=sources.filter(file=>file.webkitRelativePath);
  const archives=[];
  if(folderInputs.length)archives.push({archive:makeFolderArchive(folderInputs),label:'Extracted folder',folder:true});
  for(const file of zipInputs)archives.push({archive:await JSZip.loadAsync(file),label:file.name||'ZIP',file});
