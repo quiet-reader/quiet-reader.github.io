@@ -1609,3 +1609,27 @@ button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.action
 .favicon-preview-mono{background:var(--fg);color:var(--bg)}
 .favicon-preview-upload{background:var(--panel2);color:var(--accent);border:1px dashed var(--line)}
 @media(max-width:430px){.favicon-options{grid-template-columns:1fr}}
+
+
+/* Keep static library section labels, separators and saved-chapter rows visually still.
+   Interactive controls inside these areas retain their own button hover states. */
+.collections-heading:hover,.collections-grid:hover,.collection-detail-heading:hover,
+.library-heading:hover,.gallery-toolbar:hover,.gallery-grid:hover,.pastes-section:hover,
+#libraryEntryTabs:hover,.filter-row:hover,.ln-reader-category-filters:hover,
+.custom-category-filters:hover{
+ background:transparent!important;
+}
+.collection-index-card:hover,.collection-index-card:focus-within,
+.collection-index-grid:hover,.collection-items-grid:hover{
+ background:var(--panel)!important;
+ border-color:var(--line)!important;
+ box-shadow:none!important;
+ transform:none!important;
+}
+.chapter-row:hover,.chapter-row:focus-within,.chapter-index-row:hover,.chapter-index-row:focus-within,
+.paste-entry:hover,.paste-entry:focus-within{
+ background:var(--panel)!important;
+ border-color:var(--line)!important;
+ box-shadow:none!important;
+ transform:none!important;
+}
