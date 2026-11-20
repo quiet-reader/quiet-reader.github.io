@@ -43,8 +43,10 @@ export function applyBackground(color,remember=true){
 }
 export function applyTextColor(color,remember=true){
  const value=/^#[0-9a-f]{6}$/i.test(color)?color:null;
- if(!value){localStorage.removeItem('qrTextColor');applyTheme(localStorage.getItem('qbtheme')||'default');return}
+ if(!value){localStorage.removeItem('qrTextColor');document.documentElement.classList.remove('has-custom-text-color');applyTheme(localStorage.getItem('qbtheme')||'default');return}
  document.documentElement.style.setProperty('--fg',value);
+ document.documentElement.style.setProperty('--muted','color-mix(in srgb, '+value+' 68%, var(--bg))');
+ document.documentElement.classList.add('has-custom-text-color');
  localStorage.setItem('qrTextColor',value);
  if(remember)rememberColor('qrTextColorHistory',value);
 }
