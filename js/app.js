@@ -158,28 +158,44 @@ selectionBar.addEventListener('click',e=>{
  }
  if(e.target.closest('[data-highlight-bookmark]'))bookmarkFromSelection()
 });document.addEventListener('pointerdown',e=>{if(!e.target.closest('#selectionToolbar')&&!e.target.closest('#readingBody'))hideSelectionToolbar()});let progressTimer;window.addEventListener('scroll',()=>{if(state.screen==='reader'){clearTimeout(progressTimer);progressTimer=setTimeout(saveProgress,450)}});
-await refresh();enhanceSelects();initTheme();initTTS();setTTSEngine();let appUpdateRegistration=null;
+await refresh();enhanceSelects();initTheme();initTTS();setTTSEngine();renderInstalledAppVersion();const APP_BUILD_VERSION=import.meta.env?.VITE_APP_VERSION||'dev';
+const APP_BUILD_COMMIT=import.meta.env?.VITE_APP_COMMIT||'development';
+const APP_BUILD_SHELL=import.meta.env?.VITE_APP_SHELL||'unknown';
+let appUpdateRegistration=null;
 let reloadAfterAppUpdate=false;
 const updateStatusNodes=()=>[...document.querySelectorAll('#appUpdateStatus,[data-app-update-status]')];
 const updateInstallNodes=()=>[...document.querySelectorAll('#installAppUpdate,[data-app-update-install]')];
+const appVersionNodes=()=>[...document.querySelectorAll('[data-app-version]')];
+const publishedVersionNodes=()=>[...document.querySelectorAll('[data-published-version]')];
 function setAppUpdateStatus(message){updateStatusNodes().forEach(node=>{node.textContent=message})}
+function renderInstalledAppVersion(){const shell=String(APP_BUILD_SHELL).replace(/^quiet-reader-shell-v/,'');const message='Installed app · v'+APP_BUILD_VERSION+' · commit '+APP_BUILD_COMMIT+' · offline shell '+shell;appVersionNodes().forEach(node=>{node.textContent=message})}
+function renderPublishedAppVersion(version){const message='Latest GitHub build · v'+version.version+' · commit '+version.commit+' · offline shell '+String(version.shell||'unknown').replace(/^quiet-reader-shell-v/,'');publishedVersionNodes().forEach(node=>{node.textContent=message})}
 function refreshAppUpdateStatus(){
  const installs=updateInstallNodes();
- if(!navigator.onLine){setAppUpdateStatus('Offline. The currently cached app remains available.');installs.forEach(button=>button.disabled=!appUpdateRegistration?.waiting);return}
- if(appUpdateRegistration?.waiting){setAppUpdateStatus('A newer app version is downloaded and ready to install.');installs.forEach(button=>button.disabled=false);return}
- if(appUpdateRegistration?.installing){setAppUpdateStatus('Downloading and preparing the app update…');installs.forEach(button=>button.disabled=true);return}
- setAppUpdateStatus(navigator.serviceWorker?.controller?'Offline app shell is ready. No update is waiting.':'Preparing the first offline app cache…');
+ if(!navigator.onLine){setAppUpdateStatus('Offline. The installed version shown above remains available.');installs.forEach(button=>button.disabled=!appUpdateRegistration?.waiting);return}
+ if(appUpdateRegistration?.waiting){setAppUpdateStatus('A newer published app version is downloaded and ready to install.');installs.forEach(button=>button.disabled=false);return}
+ if(appUpdateRegistration?.installing){setAppUpdateStatus('Downloading and preparing the published app update…');installs.forEach(button=>button.disabled=true);return}
+ setAppUpdateStatus(navigator.serviceWorker?.controller?'Offline app shell is ready. Check the published build to compare versions.':'Preparing the first offline app cache…');
  installs.forEach(button=>button.disabled=true);
 }
 async function checkForAppUpdate(){
  if(!appUpdateRegistration){setAppUpdateStatus('Service worker is not ready yet.');return}
- if(!navigator.onLine){setAppUpdateStatus('Connect to the internet to check for updates.');return}
- setAppUpdateStatus('Checking the published website for an update…');
+ if(!navigator.onLine){setAppUpdateStatus('Connect to the internet to check the published GitHub version.');return}
+ setAppUpdateStatus('Reading the latest published GitHub build…');
  try{
+  const response=await fetch('./version.json?check='+Date.now(),{cache:'no-store'});
+  if(!response.ok)throw new Error('Published version metadata returned HTTP '+response.status);
+  const published=await response.json();
+  if(!published.version||!published.commit)throw new Error('Published version metadata is incomplete.');
+  renderPublishedAppVersion(published);
+  setAppUpdateStatus('Comparing installed commit '+APP_BUILD_COMMIT+' with GitHub commit '+published.commit+'…');
   await appUpdateRegistration.update();
   refreshAppUpdateStatus();
-  if(!appUpdateRegistration.waiting&&!appUpdateRegistration.installing)setAppUpdateStatus('You already have the latest published app version.');
- }catch{setAppUpdateStatus('Could not check for updates. Your current app and local data are unchanged.')}
+  if(appUpdateRegistration.waiting){setAppUpdateStatus('GitHub has v'+published.version+' ('+published.commit+'). The update is downloaded and ready to install.');return}
+  if(appUpdateRegistration.installing){setAppUpdateStatus('GitHub has v'+published.version+' ('+published.commit+'). The matching offline app shell is downloading.');return}
+  if(published.commit!==APP_BUILD_COMMIT){setAppUpdateStatus('GitHub has a newer build: v'+published.version+' ('+published.commit+'). The browser has not prepared its offline update yet; keep the app online and check again shortly.');return}
+  setAppUpdateStatus('Up to date · installed v'+APP_BUILD_VERSION+' matches GitHub v'+published.version+' · commit '+published.commit+'.');
+ }catch(error){setAppUpdateStatus('Could not verify the latest GitHub build. Installed v'+APP_BUILD_VERSION+' · commit '+APP_BUILD_COMMIT+' remains unchanged. '+(error?.message||''))}
 }
 function installAppUpdate(){
  if(!appUpdateRegistration?.waiting)return;
