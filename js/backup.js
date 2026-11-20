@@ -451,8 +451,13 @@ async function readLNReaderArchive(prepared,onBook,selectedEntryNames){
   const book=freshBook('lnreader',String(novel.name||'Imported LNReader novel'));
   book.author=String(novel.author||'');book.summary=String(novel.summary||'');
   const detailFields=Object.fromEntries(Object.entries(novel).filter(([key,value])=>!['chapters','cover','name','title','author','summary','novelSummary','genres','genre','categories','categoryIds'].includes(key)&&value!==undefined&&value!==null&&value!==''));
-  const detailLines=['LN Reader source details','Source: '+String(novel.source||pluginId||'LN Reader'),novel.sourceUrl?'Source website: '+String(novel.sourceUrl):'',novel.novelUrl?'Novel page: '+String(novel.novelUrl):'',novel.summary||novel.novelSummary?'Summary: '+String(novel.summary||novel.novelSummary):'',novel.artist?'Artist: '+String(novel.artist):'',novel.status?'Status: '+String(novel.status):'',novel.path?'Original path: '+String(novel.path):'',Object.keys(detailFields).length?'Additional backup metadata:\n'+JSON.stringify(detailFields,null,2):''].filter(Boolean).join('\n\n');
-  book.notes=[String(book.notes||'').trim(),detailLines].filter(Boolean).join('\n\n---\n\n');
+  const sourceNotes=lnReaderNotes(novel,novel.chapters,[
+   novel.artist?'Artist: '+String(novel.artist):'',
+   novel.status?'Status: '+String(novel.status):'',
+   novel.path?'Original path: '+String(novel.path):'',
+   Object.keys(detailFields).length?'Additional backup metadata:\n'+JSON.stringify(detailFields,null,2):''
+  ]);
+  book.notes=[String(book.notes||'').trim(),sourceNotes].filter(Boolean).join('\n\n---\n\n');
   book.tags=[...new Set(tags)];
   book.lnReader={pluginId,originalId:id,path:String(novel.path||''),status:novel.status||'',artist:novel.artist||'',sourceUrl:String(novel.sourceUrl||''),novelUrl:String(novel.novelUrl||''),categories:novelCategories,source:'LNReader'};
   const novelDownloadFiles=downloadZip?(zipPathIndex(downloadZip).bySegment.get(id.toLowerCase())||[]).filter(item=>{
@@ -485,7 +490,7 @@ async function readLNReaderArchive(prepared,onBook,selectedEntryNames){
     title:String(chapter.name||chapter.title||'Chapter '+(position+1)),text,images,
     createdAt:chapter.releaseTime?new Date(chapter.releaseTime).getTime()||now:now,
     updatedAt:chapter.updatedTime?new Date(chapter.updatedTime).getTime()||now:now,
-    lnReader:{id:chapter.id,path:chapter.path||'',chapterNumber:chapter.chapterNumber??position+1,page:chapter.page??'1',scanlator:chapter.scanlator||'',read:chapter.unread===false,downloaded:Boolean(chapter.isDownloaded)||Boolean(text||images.length),progress:Number(chapter.progress)||0,timeSpent:Number(chapter.timeSpent)||0}
+    lnReader:{id:chapter.id,url:lnReaderChapterUrl(chapter,novel),path:chapter.path||'',chapterNumber:chapter.chapterNumber??position+1,page:chapter.page??'1',scanlator:chapter.scanlator||'',read:chapter.unread===false,downloaded:Boolean(chapter.isDownloaded)||Boolean(text||images.length),progress:Number(chapter.progress)||0,timeSpent:Number(chapter.timeSpent)||0}
    });
    if(chapter.bookmark)book.bookmarks.push({id:safeId(),chapter:chapterIndex,offset:0,text:String(chapter.name||'Chapter '+(position+1)),created:now});
   }
@@ -497,6 +502,31 @@ async function readLNReaderArchive(prepared,onBook,selectedEntryNames){
  // Persist each completed novel before moving on, so the importer does not retain every
  // novel and its decoded images in RAM until the entire archive finishes.
  return {items,theme:null,preferences:null,source:'lnreader-zip',persisted:Boolean(onBook),lnReaderCategories:categoryRegistry.all(),importCategories:[...importedCategories],stats:{books:importedBooks,chapters:totalChapters,readable:readableChapters}};
+}
+function lnReaderChapterUrl(chapter,novel){
+ const raw=chapter?.url??chapter?.chapterUrl??chapter?.link??chapter?.path??'';
+ if(!raw)return '';
+ const value=String(raw).trim();
+ if(!value)return '';
+ try{return new URL(value,novel?.novelUrl||novel?.sourceUrl||undefined).href}catch{return value}
+}
+function lnReaderNotes(novel,chapters,extraLines=[]){
+ const list=Array.isArray(chapters)?chapters:[];
+ const rows=list.map((chapter,index)=>{
+  const title=String(chapter?.name||chapter?.title||'Chapter '+(index+1));
+  const url=lnReaderChapterUrl(chapter,novel);
+  return (index+1)+'. '+title+'\n   Chapter URL: '+(url||'Not included in backup');
+ });
+ return [
+  'LN Reader source details',
+  'Source: '+String(novel?.source||novel?.pluginId||'LN Reader'),
+  'Novel URL: '+String(novel?.novelUrl||'Not included in backup'),
+  novel?.sourceUrl?'Source website: '+String(novel.sourceUrl):'',
+  novel?.summary||novel?.novelSummary?'Summary: '+String(novel.summary||novel.novelSummary):'',
+  ...extraLines,
+  'Chapters ('+list.length+'):',
+  ...(rows.length?rows:['No chapters were included in this backup.'])
+ ].filter(Boolean).join('\n\n');
 }
 function parseLNReaderJson(data){
  const candidates=[Array.isArray(data)?data:undefined,data?.novels,data?.library?.novels,data?.data?.novels,data?.backup?.novels,data?.items];
@@ -516,10 +546,13 @@ function parseLNReaderJson(data){
   const ids=String(novel.categoryIds||'').split(',').map(value=>Number(value.trim())).filter(Number.isFinite);
   const categoryValues=Array.isArray(novel.categories)?novel.categories.map(value=>typeof value==='string'?value:categoryNames.get(Number(value?.id))||'').filter(Boolean):[];
   book.tags=[...new Set(String(genreText).split(',').map(x=>x.trim()).filter(Boolean))];
-  book.chapters=normalizeChapterList(novel.chapters).map((chapter,index)=>({title:String(chapter.name||chapter.title||'Chapter '+(index+1)),text:String(chapter.text||chapter.content||''),images:[],createdAt:Date.now(),updatedAt:Date.now(),lnReader:{id:chapter.id,path:chapter.path||'',read:Boolean(chapter.read||chapter.unread===false),progress:Number(chapter.progress)||0,bookmark:Boolean(chapter.bookmark)}}));
+  const sourceChapters=normalizeChapterList(novel.chapters);
+  book.chapters=sourceChapters.map((chapter,index)=>({title:String(chapter.name||chapter.title||'Chapter '+(index+1)),text:String(chapter.text||chapter.content||''),images:[],createdAt:Date.now(),updatedAt:Date.now(),lnReader:{id:chapter.id,url:lnReaderChapterUrl(chapter,novel),path:chapter.path||'',read:Boolean(chapter.read||chapter.unread===false),progress:Number(chapter.progress)||0,bookmark:Boolean(chapter.bookmark)}}));
   book.progress={chapter:Math.max(0,book.chapters.findLastIndex(chapter=>chapter.lnReader?.read)),offset:0};
   book.bookmarks=book.chapters.flatMap((chapter,index)=>chapter.lnReader?.bookmark?[{id:safeId(),chapter:index,offset:0,text:chapter.title,created:Date.now()}]:[]);
-  book.notes=[String(book.notes||'').trim(),['LN Reader source details',novel.source?'Source: '+String(novel.source):'',novel.sourceUrl?'Source website: '+String(novel.sourceUrl):'',novel.novelUrl?'Novel page: '+String(novel.novelUrl):'',novel.summary||novel.novelSummary?'Summary: '+String(novel.summary||novel.novelSummary):'',Object.keys(novel).filter(key=>!['chapters','cover','name','title','author','summary','novelSummary','genres','genre','categories','categoryIds'].includes(key)).length?'Additional backup metadata:\n'+JSON.stringify(Object.fromEntries(Object.entries(novel).filter(([key,value])=>!['chapters','cover','name','title','author','summary','novelSummary','genres','genre','categories','categoryIds'].includes(key)&&value!==undefined&&value!==null&&value!=='')),null,2):''].filter(Boolean).join('\n\n')].filter(Boolean).join('\n\n---\n\n');
+  const extraMetadata=Object.fromEntries(Object.entries(novel).filter(([key,value])=>!['chapters','cover','name','title','author','summary','novelSummary','genres','genre','categories','categoryIds'].includes(key)&&value!==undefined&&value!==null&&value!==''));
+  const sourceNotes=lnReaderNotes(novel,sourceChapters,Object.keys(extraMetadata).length?['Additional backup metadata:\n'+JSON.stringify(extraMetadata,null,2)]:[]);
+  book.notes=[String(book.notes||'').trim(),sourceNotes].filter(Boolean).join('\n\n---\n\n');
   book.lnReader={legacy:!book.chapters.length,originalId:novel.novelId??novel.id??null,sourceId:novel.sourceId??null,source:novel.source||'',sourceUrl:novel.sourceUrl||'',novelUrl:novel.novelUrl||'',categoryIds:novel.categoryIds||'',categories:[...new Set([...ids.map(id=>categoryNames.get(id)).filter(Boolean),...categoryValues].map(name=>categoryRegistry.name(name)).filter(Boolean))]};
   book.updated=Date.now();
   return book;
