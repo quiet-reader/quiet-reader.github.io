@@ -238,71 +238,131 @@ function chapterHtmlEntry(zip,pluginId,novelId,chapter){
  if(chapterPath){const byPath=all.find(entry=>entry.name.replace(/\\/g,'/').toLowerCase().includes(chapterPath.toLowerCase()));if(byPath)return byPath}
  return null;
 }
+function normalizedZipPath(value){return String(value||'').replace(/\\/g,'/').replace(/^\.\/+/,'').replace(/\/+/g,'/').toLowerCase()}
+function pathParts(value){return normalizedZipPath(value).split('/').filter(Boolean)}
+function jsonString(value){if(typeof value==='string')return value;if(value==null)return '';try{return JSON.stringify(value)}catch{return String(value)}}
+function chapterPayloadText(payload){
+ if(typeof payload==='string')return payload;
+ if(!payload||typeof payload!=='object')return '';
+ for(const key of ['content','contentHtml','html','text','chapterContent','body','data','正文']){
+  const value=payload[key];if(typeof value==='string'&&value.trim())return value;
+ }
+ return '';
+}
+function chapterFolderFiles(zip,pluginId,novelId,chapter,index){
+ const files=zipFiles(zip),plugin=String(pluginId||'').toLowerCase(),novel=String(novelId||'').toLowerCase();
+ const id=String(chapter.id??'').toLowerCase(),number=String(chapter.chapterNumber??index+1).toLowerCase();
+ const matching=files.filter(entry=>{
+  const parts=pathParts(entry.name);
+  const novelAt=parts.findIndex(part=>part===novel);
+  if(novelAt<0)return false;
+  if(plugin&&novelAt>0&&!parts.slice(0,novelAt).includes(plugin))return false;
+  return true;
+ });
+ const exact=matching.filter(entry=>{
+  const parts=pathParts(entry.name),base=parts.at(-1)||'';
+  return base===id+'.json'||base===number+'.json'||parts.some(part=>part===id||part===number);
+ });
+ return exact.length?exact:matching;
+}
+function findDownloadedChapterJson(zip,pluginId,novelId,chapter,index){
+ const candidates=chapterFolderFiles(zip,pluginId,novelId,chapter,index).filter(entry=>/\.json$/i.test(entry.name));
+ const id=String(chapter.id??'').toLowerCase(),number=String(chapter.chapterNumber??index+1).toLowerCase();
+ const exact=candidates.find(entry=>{const base=pathParts(entry.name).at(-1);return base===id+'.json'||base===number+'.json'});
+ if(exact)return exact;
+ const byParent=candidates.find(entry=>{const parts=pathParts(entry.name);return parts.includes(id)||parts.includes(number)});
+ if(byParent)return byParent;
+ const ordered=candidates.sort((a,b)=>{
+  const an=Number((pathParts(a.name).at(-1)||'').replace(/\.json$/,'')),bn=Number((pathParts(b.name).at(-1)||'').replace(/\.json$/,''));
+  return (Number.isFinite(an)?an:Infinity)-(Number.isFinite(bn)?bn:Infinity)||a.name.localeCompare(b.name);
+ });
+ return ordered[index]||null;
+}
+async function readDownloadedChapter(downloadZip,pluginId,novelId,chapter,index){
+ if(!downloadZip)return {text:'',images:[]};
+ const jsonEntry=findDownloadedChapterJson(downloadZip,pluginId,novelId,chapter,index);
+ if(!jsonEntry)return {text:'',images:[]};
+ let payload;try{payload=JSON.parse(await jsonEntry.async('string'))}catch{return {text:'',images:[]}}
+ const raw=chapterPayloadText(payload);
+ if(raw&&/<(?:p|div|br|img|h[1-6]|section)\b/i.test(raw)){
+  try{return await decodeHtmlChapter(raw,downloadZip,pluginId,novelId,chapter.id,jsonEntry.name)}catch{}
+ }
+ let text=raw;
+ if(!text&&Array.isArray(payload?.content))text=payload.content.map(jsonString).join('\n');
+ const folder=pathParts(jsonEntry.name).slice(0,-1).join('/');
+ const imageEntries=zipFiles(downloadZip).filter(entry=>{
+  const name=normalizedZipPath(entry.name);
+  return name.startsWith(folder+'/')&&/\.(png|jpe?g|webp|gif|avif|bmp)$/i.test(name);
+ }).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
+ const images=[];
+ for(const entry of imageEntries){
+  const bytes=await entry.async('uint8array'),mime=guessMime(entry.name),id=safeId();
+  images.push({id,data:'data:'+mime+';base64,'+bytesToBase64(bytes),mime,name:entry.name.split('/').pop()||'image'});
+  text=(text||'').replaceAll(entry.name.split('/').pop(), '[IMAGE:'+id+']');
+ }
+ return {text,images};
+}
 async function readLNReaderArchive(file){
  const outer=await JSZip.loadAsync(file);
- const dataEntry=findZipEntry(outer,name=>name.toLowerCase()==='data.zip'||name.toLowerCase().endsWith('/data.zip'));
- if(!dataEntry)throw new Error('This ZIP is not a recognised LNReader backup. Expected its data.zip archive.');
+ const dataEntry=findZipEntry(outer,name=>pathParts(name).at(-1)==='data.zip');
+ if(!dataEntry)throw new Error('This ZIP is not a recognised LNReader backup. Expected data.zip and download.zip.');
  const dataZip=await JSZip.loadAsync(await dataEntry.async('uint8array'));
- const novelFolder=findZipEntry(dataZip,name=>name.toLowerCase().includes('novelandchapters/')&&name.toLowerCase().endsWith('.json'));
- if(!novelFolder)throw new Error('The LNReader data archive has no NovelAndChapters records.');
- const categoryEntry=findZipEntry(dataZip,name=>name.toLowerCase()==='category.json'||name.toLowerCase().endsWith('/category.json'));
- let categories=[];
- if(categoryEntry){try{categories=JSON.parse(await categoryEntry.async('string'))||[]}catch{}}
- const categoryNames=new Map(categories.map(category=>[Number(category.id),String(category.name||'')]));
- const novelFilesEntry=findZipEntry(outer,name=>name.toLowerCase()==='novel-files.zip'||name.toLowerCase().endsWith('/novel-files.zip'));
- const novelFiles=novelFilesEntry?await JSZip.loadAsync(await novelFilesEntry.async('uint8array')):null;
- const novelEntries=zipFiles(dataZip).filter(entry=>entry.name.toLowerCase().includes('novelandchapters/')&&entry.name.toLowerCase().endsWith('.json'));
+ const novelEntries=zipFiles(dataZip).filter(entry=>normalizedZipPath(entry.name).includes('novelandchapters/')&&/\.json$/i.test(entry.name));
+ if(!novelEntries.length)throw new Error('The LNReader data.zip archive has no NovelAndChapters JSON records.');
+ const categoryEntry=findZipEntry(dataZip,name=>pathParts(name).at(-1)==='category.json');
+ let categories=[];if(categoryEntry){try{const parsed=JSON.parse(await categoryEntry.async('string'));categories=Array.isArray(parsed)?parsed:[]}catch{}}
+ const categoryNames=new Map(categories.map(category=>[Number(category.id),String(category.name||'').trim()]).filter(([,name])=>name));
+ const downloadEntry=findZipEntry(outer,name=>pathParts(name).at(-1)==='download.zip');
+ const downloadZip=downloadEntry?await JSZip.loadAsync(await downloadEntry.async('uint8array')):null;
  const items=[];
  for(const entry of novelEntries){
-  let novel;
-  try{novel=JSON.parse(await entry.async('string'))}catch{continue}
+  let novel;try{novel=JSON.parse(await entry.async('string'))}catch{continue}
   if(!novel||typeof novel!=='object'||!Array.isArray(novel.chapters))continue;
-  const id=Number(novel.id)||0,pluginId=String(novel.pluginId||'local');
+  const id=String(novel.id??pathParts(entry.name).at(-1)?.replace(/\.json$/i,'')??'');
+  const pluginId=String(novel.pluginId||pathParts(entry.name).find((part,index,parts)=>part.toLowerCase()==='novelandchapters'?false:parts[index+1]?.toLowerCase()==='novelandchapters')||'local');
   const tags=String(novel.genres||'').split(',').map(value=>value.trim()).filter(Boolean);
-  const novelCategories=categories.filter(category=>(category.novelIds||[]).map(Number).includes(id)).map(category=>categoryNames.get(Number(category.id))).filter(Boolean);
+  const novelCategories=categories.filter(category=>(category.novelIds||[]).map(String).includes(id)||Number(category.novelId)===Number(id)).map(category=>categoryNames.get(Number(category.id))).filter(Boolean);
   const book=freshBook('lnreader',String(novel.name||'Imported LNReader novel'));
-  book.author=String(novel.author||'');
-  book.summary=String(novel.summary||'');
+  book.author=String(novel.author||'');book.summary=String(novel.summary||'');
   book.tags=[...new Set([...tags,...novelCategories])];
   book.lnReader={pluginId,originalId:id,path:String(novel.path||''),status:novel.status||'',artist:novel.artist||'',source:'LNReader'};
-  if(typeof novel.cover==='string'&&(novel.cover.startsWith('https://')||novel.cover.startsWith('http://')))book.cover=novel.cover;
-  else{
-   const coverNames=[String(novel.cover||''),String(id),String(id)+'.png',String(id)+'.jpg','cover','cover.png','cover.jpg'];
-   const cover=findZipEntry(dataZip,name=>coverNames.some(value=>value&&name.toLowerCase().endsWith('/covers/'+value.toLowerCase())||value&&name.toLowerCase().endsWith('/'+value.toLowerCase())))||
-    (novelFiles&&findZipEntry(novelFiles,name=>name.toLowerCase().includes('/'+pluginId.toLowerCase()+'/'+id.toLowerCase()+'/')&&/(^|\/)cover\.(png|jpe?g|webp)$/i.test(name)))||
-    findZipEntry(outer,name=>/(^|\/)cover\.(png|jpe?g|webp)$/i.test(name)&&name.toLowerCase().includes(String(id).toLowerCase()));
-   if(cover){const bytes=await cover.async('uint8array'),mime=/\.(jpe?g|png|webp|gif|avif)$/i.test(cover.name)?guessMime(cover.name):'image/png';book.cover='data:'+mime+';base64,'+bytesToBase64(bytes)}
-  }
-  const readChapters=novel.chapters.map((chapter,index)=>({chapter,index})).sort((a,b)=>(Number(a.chapter.position??a.index)-Number(b.chapter.position??b.index)));
+  const novelDownloadFiles=downloadZip?zipFiles(downloadZip).filter(item=>{
+   const parts=pathParts(item.name),at=parts.indexOf(id.toLowerCase());
+   return at>=0&&(!pluginId||parts.slice(0,at).includes(pluginId.toLowerCase())||parts.length-at>1);
+  }):[];
+  const cover=novelDownloadFiles.find(item=>/(^|\/)(cover|thumbnail)\.(png|jpe?g|webp|gif|avif)$/i.test(normalizedZipPath(item.name)))||
+   (downloadZip&&findZipEntry(downloadZip,name=>{const p=pathParts(name);return p.includes(id.toLowerCase())&&/(^|\/)(cover|thumbnail)\.(png|jpe?g|webp|gif|avif)$/i.test(name)}));
+  if(typeof novel.cover==='string'&&/^https?:\/\//i.test(novel.cover))book.cover=novel.cover;
+  else if(cover){const bytes=await cover.async('uint8array');book.cover='data:'+guessMime(cover.name)+';base64,'+bytesToBase64(bytes)}
+  const ordered=novel.chapters.map((chapter,index)=>({chapter,index})).sort((a,b)=>{
+   const ap=Number(a.chapter.position??a.chapter.chapterNumber??a.index+1),bp=Number(b.chapter.position??b.chapter.chapterNumber??b.index+1);
+   return ap-bp||a.index-b.index;
+  });
   let lastReadIndex=-1,lastReadAt=0;book.readingHistory=[];
-  for(const {chapter,index} of readChapters){
-   let text='',images=[];
-   if(novelFiles){
-    const htmlEntry=chapterHtmlEntry(novelFiles,pluginId,id,chapter);
-    if(htmlEntry){try{const decoded=await decodeHtmlChapter(await htmlEntry.async('string'),novelFiles,pluginId,id,chapter.id,htmlEntry.name);text=decoded.text;images=decoded.images}catch(error){console.warn('LNReader chapter import failed',chapter.name,error)}}
+  for(let position=0;position<ordered.length;position++){
+   const {chapter,index}=ordered[position];
+   const decoded=await readDownloadedChapter(downloadZip,pluginId,id,chapter,position);
+   let text=decoded.text,images=decoded.images;
+   if(!text&&downloadZip){
+    const html=chapterHtmlEntry(downloadZip,pluginId,id,chapter);
+    if(html){try{const result=await decodeHtmlChapter(await html.async('string'),downloadZip,pluginId,id,chapter.id,html.name);text=result.text;images=result.images}catch(error){console.warn('LNReader chapter import failed',chapter.name,error)}}
    }
-   const chapterIndex=book.chapters.length;
-   const now=Date.now();
-   const readAt=chapter.readTime?new Date(chapter.readTime).getTime():0;
+   const now=Date.now(),readAt=chapter.readTime?new Date(chapter.readTime).getTime():0,chapterIndex=book.chapters.length;
    if(readAt>lastReadAt){lastReadAt=readAt;lastReadIndex=chapterIndex}
    if(chapter.readTime)book.readingHistory.push({chapter:chapterIndex,readAt:chapter.readTime});
    book.chapters.push({
-    title:String(chapter.name||'Chapter '+(index+1)),text,images,
+    title:String(chapter.name||chapter.title||'Chapter '+(position+1)),text,images,
     createdAt:chapter.releaseTime?new Date(chapter.releaseTime).getTime()||now:now,
     updatedAt:chapter.updatedTime?new Date(chapter.updatedTime).getTime()||now:now,
-    lnReader:{id:chapter.id,path:chapter.path||'',chapterNumber:chapter.chapterNumber??index+1,page:chapter.page??'1',scanlator:chapter.scanlator||'',read:chapter.unread===false,downloaded:Boolean(chapter.isDownloaded),progress:Number(chapter.progress)||0,timeSpent:Number(chapter.timeSpent)||0}
+    lnReader:{id:chapter.id,path:chapter.path||'',chapterNumber:chapter.chapterNumber??position+1,page:chapter.page??'1',scanlator:chapter.scanlator||'',read:chapter.unread===false,downloaded:Boolean(chapter.isDownloaded)||Boolean(text||images.length),progress:Number(chapter.progress)||0,timeSpent:Number(chapter.timeSpent)||0}
    });
-   if(chapter.bookmark)book.bookmarks.push({id:safeId(),chapter:chapterIndex,offset:0,text:String(chapter.name||'Chapter '+(index+1)),created:now});
+   if(chapter.bookmark)book.bookmarks.push({id:safeId(),chapter:chapterIndex,offset:0,text:String(chapter.name||'Chapter '+(position+1)),created:now});
   }
-  book.progress={chapter:Math.max(0,lastReadIndex),offset:0};
-  book.readingHistory=book.readingHistory.slice(-100);
-  book.updated=Date.now();
-  items.push(book);
+  book.progress={chapter:Math.max(0,lastReadIndex),offset:0};book.readingHistory=book.readingHistory.slice(-100);book.updated=Date.now();items.push(book);
  }
  if(!items.length)throw new Error('No readable novels were found in this LNReader backup.');
- const saved=(()=>{try{return JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]')}catch{return []}})();
- const merged=[...new Set([...saved,...categories.map(category=>String(category.name||'').trim()).filter(Boolean)])];
- localStorage.setItem('qrLibraryCategories',JSON.stringify(merged));
+ // LNReader categories are converted into each book's normal tags. Do not inject them
+ // into the app-wide custom-category registry, which has a separate lifecycle.
  return {items,theme:null,preferences:null,source:'lnreader-zip'};
 }
 function parseLNReaderJson(data){
