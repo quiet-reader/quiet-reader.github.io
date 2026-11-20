@@ -352,7 +352,7 @@ async function inspectLNReaderSources(source){
    if(/\.json$/i.test(base)&&/(settings|plugin|version|config|category)/i.test(base))metadataFiles.push(entry.name);
    if(base.toLowerCase()==='data.zip'&&!dataZip)dataZip=await JSZip.loadAsync(await entry.async('uint8array'));
    if(base.toLowerCase()==='download.zip'&&!downloadZip)downloadZip=await JSZip.loadAsync(await entry.async('uint8array'));
-   if(base.toLowerCase()==='novel-files.zip'){const nested=await JSZip.loadAsync(await entry.async('uint8array'));if(!dataZip&&archiveHasNovelMetadata(nested))dataZip=nested;else if(!downloadZip)downloadZip=nested}
+   if(base.toLowerCase()==='novel-files.zip'){const nested=await JSZip.loadAsync(await entry.async('uint8array'));if(!dataZip)dataZip=nested;downloadZip=downloadZip||nested}
   }
   if(!dataZip&&archiveHasNovelMetadata(archive))dataZip=archive;
   if(!downloadZip&&entries.some(entry=>/\.(html?|png|jpe?g|webp|gif|avif|bmp)$/i.test(entry.name)))downloadZip=archive;
@@ -371,7 +371,7 @@ async function inspectLNReaderSources(source){
  if(!categoryEntry)missing.push('category.json (LN Reader category subcategories will not be created)');
  if(downloadZip===dataZip)missing.push('A separate download archive was not detected; chapter text and images may be incomplete');
  const size=sources.reduce((sum,file)=>sum+(Number(file.size)||0),0),expandedSize=archives.reduce((sum,item)=>sum+estimateExpandedSize(item.archive),0)+estimateExpandedSize(dataZip)+(downloadZip!==dataZip?estimateExpandedSize(downloadZip):0);
- return {outer,dataZip,downloadZip,novelEntries,novelRecords,categories,categoryEntry,settingsFiles:[...new Set(metadataFiles)],chapters,outerCount:archives.reduce((sum,item)=>sum+zipFiles(item.archive).length,0),folderCount:archives.reduce((sum,item)=>sum+countArchiveFolders(item.archive),0)+countArchiveFolders(dataZip)+(downloadZip!==dataZip?countArchiveFolders(downloadZip):0),dataCount:dataFiles.length,downloadCount:zipFiles(downloadZip).length,missing,size,expandedSize,fallback,sourceLabel:sources.length===1?(folderInputs.length?'Extracted folder':sources[0].name||'LN Reader backup'):sources.length+' selected files'};
+ return {outer,dataZip,downloadZip,novelEntries,novelRecords,categories,categoryEntry,settingsFiles:[...new Set([...metadataFiles,...dataFiles.filter(entry=>/\.json$/i.test(entry.name)&&/(settings|plugin|version|config|category)/i.test(entry.name)).map(entry=>entry.name)])],chapters,outerCount:archives.reduce((sum,item)=>sum+zipFiles(item.archive).length,0),folderCount:archives.reduce((sum,item)=>sum+countArchiveFolders(item.archive),0)+countArchiveFolders(dataZip)+(downloadZip!==dataZip?countArchiveFolders(downloadZip):0),dataCount:dataFiles.length,downloadCount:zipFiles(downloadZip).length,missing,size,expandedSize,fallback,sourceLabel:sources.length===1?(folderInputs.length?'Extracted folder':sources[0].name||'LN Reader backup'):sources.length+' selected files'};
 }
 function countArchiveFolders(archive){const folders=new Set();for(const entry of zipFiles(archive)){const parts=pathParts(entry.name);for(let i=1;i<parts.length;i++)folders.add(parts.slice(0,i).join('/'))}return folders.size}
 function showLNReaderPreflight(file,report,source=file){
@@ -397,7 +397,7 @@ async function readLNReaderArchive(file,prepared,onBook){
   const id=String(novel.id??pathParts(entry.name).at(-1)?.replace(/\.json$/i,'')??'');
   const pluginId=String(novel.pluginId||pathParts(entry.name).find((part,index,parts)=>part.toLowerCase()==='novelandchapters'?false:parts[index+1]?.toLowerCase()==='novelandchapters')||'local');
   const tags=String(novel.genres||'').split(',').map(value=>value.trim()).filter(Boolean);
-  const novelCategories=categories.filter(category=>(category.novelIds||[]).map(String).includes(id)||Number(category.novelId)===Number(id)).map(category=>categoryNames.get(Number(category.id))).filter(Boolean);
+  const novelCategories=categories.filter(category=>(Array.isArray(category.novelIds)?category.novelIds.map(String):String(category.novelIds||'').split(',')).includes(id)||Number(category.novelId)===Number(id)).map(category=>categoryNames.get(Number(category.id))).filter(Boolean);
   const book=freshBook('lnreader',String(novel.name||'Imported LNReader novel'));
   book.author=String(novel.author||'');book.summary=String(novel.summary||'');
   book.tags=[...new Set(tags)];
