@@ -24,7 +24,8 @@ function tagColorsModal(){const tags=[...new Set(state.books.flatMap(book=>Array
 function editTagsModal(){
  if(!state.book)return;
  const current=new Set(Array.isArray(state.book.tags)?state.book.tags:[]);
- const available=[...new Set(state.books.flatMap(book=>Array.isArray(book.tags)?book.tags:[]).map(tag=>String(tag).trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
+ const managedCategories=(()=>{try{const value=JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]');return Array.isArray(value)?value.filter(tag=>typeof tag==='string'&&tag.trim()):[]}catch{return []}})();
+ const available=[...new Set([...state.books.flatMap(book=>Array.isArray(book.tags)?book.tags:[]).map(tag=>String(tag).trim()).filter(Boolean),...managedCategories])].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
  let colors={};try{colors=JSON.parse(localStorage.getItem('qrTagColors')||'{}')}catch{}
  const palette=['#d7c477','#83b8e8','#8bc58b','#e7a0bd','#b9a0e8','#e5a16b','#72c5bd','#d58f8f'];
  const colorFor=(tag,i)=>colors[tag]||palette[Math.max(0,available.indexOf(tag))%palette.length];
