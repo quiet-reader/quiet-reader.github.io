@@ -1,7 +1,7 @@
 import {$} from './utils.js';
 
 const palettes={
- default:{bg:'#474747',panel:'#505050',panel2:'#5b5b5b',fg:'#eeeeee',muted:'#c1c1c1',line:'#6b6b6b',accent:'#b9f27c'},
+ default:{bg:'#47474747',panel:'#505050',panel2:'#5b5b5b',fg:'#eeeeee',muted:'#c1c1c1',line:'#6b6b6b',accent:'#b9f27c'},
  dark:{bg:'#10141b',panel:'#171e28',panel2:'#222d3a',fg:'#e9eef4',muted:'#95a2b1',line:'#303d4d',accent:'#b9f27c'},
  midnight:{bg:'#090e18',panel:'#111a29',panel2:'#1a2940',fg:'#e7eefb',muted:'#91a2bb',line:'#2c3d57',accent:'#8be9fd'},
  ocean:{bg:'#0b1820',panel:'#122832',panel2:'#1b3945',fg:'#e1f2f3',muted:'#8eafb4',line:'#2c5058',accent:'#63d8c5'},
@@ -33,7 +33,7 @@ export function applyAccent(color,remember=true){
  setFavicon(value);
 }
 export function applyBackground(color,remember=true){
- const value=/^#[0-9a-f]{6}$/i.test(color)?color:null;
+ const value=/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(color)?color:null;
  if(!value){localStorage.removeItem('qrBackground');applyTheme(localStorage.getItem('qbtheme')||'default');return}
  document.documentElement.style.setProperty('--bg',value);
  document.documentElement.style.setProperty('--panel','color-mix(in srgb, '+value+' 88%, var(--fg))');
