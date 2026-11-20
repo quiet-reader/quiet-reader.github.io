@@ -26,7 +26,7 @@ export function applyAccent(color,remember=true){
  if(localStorage.getItem('qrAutoReadHighlightCustom')!=='true'){document.documentElement.style.setProperty('--auto-read-highlight',value);localStorage.setItem('qrAutoReadHighlight',value)}
  localStorage.setItem('qrAccent',value);
  if(remember)rememberColor('qrAccentHistory',value);
- const input=$('autoReadHighlightColor');if(input)input.value=value;
+ if(localStorage.getItem('qrAutoReadHighlightCustom')!=='true'){const input=$('autoReadHighlightColor');if(input)input.value=value;}
  setFavicon();
 }
 export function applyBackground(color,remember=true){
