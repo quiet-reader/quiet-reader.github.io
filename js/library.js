@@ -37,7 +37,7 @@ function drawCollections(grid){
  const {view,columns}=collectionDisplaySettings();
  grid.style.setProperty('--library-columns',String(columns));grid.classList.toggle('compact-view',view==='compact');grid.classList.toggle('expanded-view',view!=='compact');
  if(!active){
-  grid.innerHTML='<div class="collections-heading"><div><span class="section-kicker">YOUR SAVED GROUPS</span><h2>Collections</h2></div><button id="createCollectionButton" class="primary collection-create-plus" aria-label="Create collection" title="Create collection">＋</button></div>';
+  grid.innerHTML='<div class="collections-heading"><div><span class="section-kicker">YOUR SAVED GROUPS</span><h2>Collections</h2></div></div>';
   if(!collections.length){grid.innerHTML+='<div class="empty-state"><span class="empty-icon">▣</span><h2>No collections yet.</h2><p>Create a collection, then save novels, galleries, chapters or images into it.</p></div>';return}
   grid.innerHTML+='<div class="book-grid collection-index-grid '+(view==='compact'?'compact-view':'expanded-view')+'" style="--library-columns:'+columns+'">'+collections.map(c=>{
    const cover=c.cover||'',tags=(c.tags||[]).map(tag=>'<span class="book-tag">#'+collectionEscape(tag)+'</span>').join('');
