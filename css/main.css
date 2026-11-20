@@ -1479,3 +1479,6 @@ button.primary:hover:not(:disabled){background-color:var(--accent-hover,var(--ac
 .reader-panel::-webkit-scrollbar-thumb,#screen-reader::-webkit-scrollbar-thumb,.reader-settings-group::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--fg) 22%,var(--bg));border-radius:20px;border:1px solid var(--bg)}
 .history-lock-toggle{display:inline-flex;align-items:center;gap:7px}
 .history-lock-toggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* The custom hover surface applies to primary actions too; accent remains their resting color. */
+button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.actions .card-open-action:hover:not(:disabled){background:var(--hover)!important;border-color:var(--hover-border)!important;color:var(--fg)!important}
