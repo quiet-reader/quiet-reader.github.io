@@ -414,6 +414,7 @@ async function readLNReaderArchive(prepared,onBook){
  const categories=prepared?.categories||[];
  const categoryRegistry=createLNReaderCategoryResolver();
  const categoryNames=new Map(categories.map(category=>[Number(category.id),categoryRegistry.name(category.name)]).filter(([,name])=>name));
+ const importedCategories=new Set([...categoryNames.values()].filter(Boolean));
  const downloadZip=prepared?.chapterArchive||prepared?.downloadZip||dataZip;
  const novelRecords=prepared?.novelRecords||[];
  primeZipPathIndex(downloadZip,novelRecords);
@@ -471,7 +472,7 @@ async function readLNReaderArchive(prepared,onBook){
  if(!importedBooks)throw new Error('No readable novels were found in this LNReader backup.');
  // Persist each completed novel before moving on, so the importer does not retain every
  // novel and its decoded images in RAM until the entire archive finishes.
- return {items,theme:null,preferences:null,source:'lnreader-zip',persisted:Boolean(onBook),lnReaderCategories:categoryRegistry.all(),stats:{books:importedBooks,chapters:totalChapters,readable:readableChapters}};
+ return {items,theme:null,preferences:null,source:'lnreader-zip',persisted:Boolean(onBook),lnReaderCategories:categoryRegistry.all(),importCategories:[...importedCategories],stats:{books:importedBooks,chapters:totalChapters,readable:readableChapters}};
 }
 function parseLNReaderJson(data){
  const candidates=[Array.isArray(data)?data:undefined,data?.novels,data?.library?.novels,data?.data?.novels,data?.backup?.novels,data?.items];
@@ -501,7 +502,8 @@ function parseLNReaderJson(data){
  if(!items.length)throw new Error('The LNReader JSON backup contains no novels.');
  // Imported LN Reader categories are stored on the book and in the dedicated
  // LN Reader category registry, separate from the app-wide custom tags.
- return {items,theme:null,preferences:null,source:'lnreader-json',lnReaderCategories:categoryRegistry.all(),stats:{books:items.length,chapters:items.reduce((sum,book)=>sum+book.chapters.length,0),readable:items.reduce((sum,book)=>sum+book.chapters.filter(chapter=>String(chapter.text||'').trim()).length,0)}};
+ const importCategories=[...new Set([...categories.map(category=>categoryRegistry.name(category.name)),...items.flatMap(book=>book.lnReader?.categories||[])])].filter(Boolean);
+ return {items,theme:null,preferences:null,source:'lnreader-json',lnReaderCategories:categoryRegistry.all(),importCategories,stats:{books:items.length,chapters:items.reduce((sum,book)=>sum+book.chapters.length,0),readable:items.reduce((sum,book)=>sum+book.chapters.filter(chapter=>String(chapter.text||'').trim()).length,0)}};
 }
 async function createGalleryFromZipEntries(file,entries){
  if(!entries.length)throw new Error('No supported images were found in this ZIP.');
@@ -607,7 +609,7 @@ export async function importBackup(file,options={}){
    let history=[];try{const saved=JSON.parse(localStorage.getItem(historyKey)||'[]');if(Array.isArray(saved))history=saved}catch{}
    const names=sources.map(source=>String(source.webkitRelativePath||source.name||'LN Reader source')).filter(Boolean),folderName=String(sources.find(source=>source.webkitRelativePath)?.webkitRelativePath||'').split('/')[0];
    const bytes=sources.reduce((sum,source)=>sum+(Number(source.size)||0),0);
-   const report={id:'lnr-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),importedAt:Date.now(),name:isFolder?(folderName||'Extracted LN Reader folder'):names.length===1?names[0]:names.slice(0,3).join(', ')+(names.length>3?' +'+(names.length-3)+' more':''),files:names.slice(0,100),format:isFolder?'Extracted folder':sources.some(source=>/\.zip$/i.test(source.name||''))?'ZIP archive':'JSON backup',sizeBytes:bytes,novels:Number(stats.books)||0,chapters:Number(stats.chapters)||0,readableChapters:Number(stats.readable)||0,categories:restored.lnReaderCategories||[],settingsFiles:options.prepared?.settingsFiles||[]};
+   const report={id:'lnr-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),importedAt:Date.now(),name:isFolder?(folderName||'Extracted LN Reader folder'):names.length===1?names[0]:names.slice(0,3).join(', ')+(names.length>3?' +'+(names.length-3)+' more':''),files:names.slice(0,100),format:isFolder?'Extracted folder':sources.some(source=>/\.zip$/i.test(source.name||''))?'ZIP archive':'JSON backup',sizeBytes:bytes,novels:Number(stats.books)||0,chapters:Number(stats.chapters)||0,readableChapters:Number(stats.readable)||0,categories:restored.importCategories||[],settingsFiles:options.prepared?.settingsFiles||[]};
    history.unshift(report);localStorage.setItem(historyKey,JSON.stringify(history));
   }
   if(restored.source==='lnreader-json'){
