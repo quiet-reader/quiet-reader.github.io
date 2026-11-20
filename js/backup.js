@@ -406,7 +406,7 @@ function showLNReaderPreflight(file,report,source=file){
  modal('Review LN Reader backup',html,()=>{$('cancelLNReaderPreflight').onclick=closeModal;$('confirmLNReaderPreflight').onclick=()=>{closeModal();void importBackup(source,{prepared:report})}});
 }
 function readLNReaderCategoryRegistry(){try{const value=JSON.parse(localStorage.getItem('qrLNReaderCategories')||'[]');return Array.isArray(value)?value.map(name=>String(name||'').trim()).filter(Boolean):[]}catch{return []}}
-function createLNReaderCategoryResolver(){const names=readLNReaderCategoryRegistry(),byKey=new Map(names.map(name=>[name.toLocaleLowerCase(),name]));return{name(name){const clean=String(name||'').trim();if(!clean)return '';const key=clean.toLocaleLowerCase();if(byKey.has(key))return byKey.get(key);byKey.set(key,clean);names.push(clean);return clean},all(){return [...names]}}}
+function createLNReaderCategoryResolver(){const names=[...new Set([...readLNReaderCategoryRegistry(),...state.books.filter(book=>book.source==='lnreader').flatMap(book=>book.lnReader?.categories||[]).map(name=>String(name||'').trim()).filter(Boolean)])],byKey=new Map(names.map(name=>[name.toLocaleLowerCase(),name]));return{name(name){const clean=String(name||'').trim();if(!clean)return '';const key=clean.toLocaleLowerCase();if(byKey.has(key))return byKey.get(key);byKey.set(key,clean);names.push(clean);return clean},all(){return [...names]}}}
 async function readLNReaderArchive(prepared,onBook){
  const dataZip=prepared?.dataZip;
  if(!dataZip)throw new Error('This is not a recognised LN Reader archive or extracted backup folder.');
@@ -607,7 +607,7 @@ export async function importBackup(file,options={}){
    let history=[];try{const saved=JSON.parse(localStorage.getItem(historyKey)||'[]');if(Array.isArray(saved))history=saved}catch{}
    const names=sources.map(source=>String(source.webkitRelativePath||source.name||'LN Reader source')).filter(Boolean);
    const bytes=sources.reduce((sum,source)=>sum+(Number(source.size)||0),0);
-   const report={id:'lnr-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),importedAt:Date.now(),name:names.length===1?names[0]:names.length+' selected files',files:names.slice(0,100),format:isFolder?'Extracted folder':sources.some(source=>/\\.zip$/i.test(source.name||''))?'ZIP archive':'JSON backup',sizeBytes:bytes,novels:Number(stats.books)||0,chapters:Number(stats.chapters)||0,readableChapters:Number(stats.readable)||0,categories:restored.lnReaderCategories||[],settingsFiles:options.prepared?.settingsFiles||[]};
+   const report={id:'lnr-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),importedAt:Date.now(),name:names.length===1?names[0]:names.length+' selected files',files:names.slice(0,100),format:isFolder?'Extracted folder':sources.some(source=>/\.zip$/i.test(source.name||''))?'ZIP archive':'JSON backup',sizeBytes:bytes,novels:Number(stats.books)||0,chapters:Number(stats.chapters)||0,readableChapters:Number(stats.readable)||0,categories:restored.lnReaderCategories||[],settingsFiles:options.prepared?.settingsFiles||[]};
    history.unshift(report);localStorage.setItem(historyKey,JSON.stringify(history.slice(0,200)));
   }
   if(restored.source==='lnreader-json'){
