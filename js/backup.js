@@ -608,7 +608,7 @@ export async function importBackup(file,options={}){
    const names=sources.map(source=>String(source.webkitRelativePath||source.name||'LN Reader source')).filter(Boolean),folderName=String(sources.find(source=>source.webkitRelativePath)?.webkitRelativePath||'').split('/')[0];
    const bytes=sources.reduce((sum,source)=>sum+(Number(source.size)||0),0);
    const report={id:'lnr-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),importedAt:Date.now(),name:isFolder?(folderName||'Extracted LN Reader folder'):names.length===1?names[0]:names.slice(0,3).join(', ')+(names.length>3?' +'+(names.length-3)+' more':''),files:names.slice(0,100),format:isFolder?'Extracted folder':sources.some(source=>/\.zip$/i.test(source.name||''))?'ZIP archive':'JSON backup',sizeBytes:bytes,novels:Number(stats.books)||0,chapters:Number(stats.chapters)||0,readableChapters:Number(stats.readable)||0,categories:restored.lnReaderCategories||[],settingsFiles:options.prepared?.settingsFiles||[]};
-   history.unshift(report);localStorage.setItem(historyKey,JSON.stringify(history.slice(0,200)));
+   history.unshift(report);localStorage.setItem(historyKey,JSON.stringify(history));
   }
   if(restored.source==='lnreader-json'){
    toast('LNReader 1.x · '+restored.items.length+' novels imported; chapter files and reading progress are not in this backup');
