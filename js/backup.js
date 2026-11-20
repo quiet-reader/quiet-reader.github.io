@@ -363,7 +363,8 @@ async function inspectLNReaderSources(source){
  const dataFiles=zipFiles(dataZip);
  for(const entry of dataFiles){const base=pathParts(entry.name).at(-1)||'';if(base==='download.zip'||base==='novel-files.zip'){const nested=await JSZip.loadAsync(await entry.async('uint8array'));extraArchives.push(nested);downloadZip=downloadZip||nested}}
  if(!downloadZip)downloadZip=dataZip;
- const chapterArchive=[...archives.map(item=>item.archive),...extraArchives,dataZip,downloadZip].filter(Boolean).reduce((merged,archive)=>combineArchiveViews(merged,archive),null);
+ const contentArchives=archives.filter(item=>item.folder||!zipFiles(item.archive).some(entry=>['data.zip','download.zip','novel-files.zip'].includes(pathParts(entry.name).at(-1)))).map(item=>item.archive);
+ const chapterArchive=[...contentArchives,...extraArchives,dataZip,downloadZip].filter(Boolean).reduce((merged,archive)=>combineArchiveViews(merged,archive),null);
  const novelSourceFiles=zipFiles(chapterArchive),novelEntries=novelSourceFiles.filter(entry=>normalizedZipPath(entry.name).includes('novelandchapters/')&&/\.json$/i.test(entry.name)),novelRecords=[];
  for(const entry of novelEntries){try{const novel=JSON.parse(await entry.async('string'));if(novel&&typeof novel==='object'&&novel.chapters!==undefined)novelRecords.push({entry,novel:{...novel,chapters:normalizeChapterList(novel.chapters)}})}catch{}}
  if(!novelRecords.length){for(const entry of novelSourceFiles.filter(entry=>/\.json$/i.test(entry.name)&&/(novels?|novel-files)/i.test(entry.name))){try{const novel=JSON.parse(await entry.async('string'));if(novel&&typeof novel==='object'&&novel.chapters!==undefined)novelRecords.push({entry,novel:{...novel,chapters:normalizeChapterList(novel.chapters)}})}catch{}}}
