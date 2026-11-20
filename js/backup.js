@@ -188,7 +188,10 @@ const zipFileCache=new WeakMap();
 const zipPathIndexCache=new WeakMap();
 const chapterFolderCache=new WeakMap();
 function zipFiles(zip){if(!zip||typeof zip!=='object')return [];let files=zipFileCache.get(zip);if(!files){files=Object.values(zip.files||{}).filter(entry=>!entry.dir);zipFileCache.set(zip,files)}return files}
-function zipPathIndex(zip){let index=zipPathIndexCache.get(zip);if(index)return index;const byPath=new Map(),byBase=new Map(),bySegment=new Map(),imagesByFolder=new Map(),htmlFiles=[];for(const entry of zipFiles(zip)){const path=normalizedZipPath(entry.name),parts=pathParts(path);byPath.set(path,entry);const base=parts.at(-1);if(!byBase.has(base))byBase.set(base,[]);byBase.get(base).push(entry);if(/\.html?$/i.test(base))htmlFiles.push(entry);for(const part of new Set(parts)){if(!bySegment.has(part))bySegment.set(part,[]);bySegment.get(part).push(entry)}if(/\.(png|jpe?g|webp|gif|avif|bmp)$/i.test(base)){for(let i=1;i<parts.length;i++){const folder=parts.slice(0,i).join('/');if(!imagesByFolder.has(folder))imagesByFolder.set(folder,[]);imagesByFolder.get(folder).push(entry)}}}for(const images of imagesByFolder.values())images.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));index={byPath,byBase,bySegment,imagesByFolder,htmlFiles};zipPathIndexCache.set(zip,index);return index}
+function zipPathIndex(zip){let index=zipPathIndexCache.get(zip);if(index)return index;const byPath=new Map(),bySegment=new Map();for(const entry of zipFiles(zip))byPath.set(normalizedZipPath(entry.name),entry);index={byPath,bySegment};zipPathIndexCache.set(zip,index);return index}
+function primeZipPathIndex(zip,novelRecords){const wanted=new Set();for(const record of novelRecords){const novel=record.novel||{},novelId=String(novel.id??novel.novelId??'').toLowerCase();if(novelId)wanted.add(novelId);for(const chapter of normalizeChapterList(novel.chapters)){for(const value of [chapter.id,chapter.chapterId,chapter.chapterNumber,chapter.position])if(value!==undefined&&value!==null)wanted.add(String(value).toLowerCase())}}const byPath=new Map(),bySegment=new Map();for(const entry of zipFiles(zip)){const path=normalizedZipPath(entry.name);byPath.set(path,entry);for(const part of new Set(pathParts(path)))if(wanted.has(part)){if(!bySegment.has(part))bySegment.set(part,[]);bySegment.get(part).push(entry)}}zipPathIndexCache.set(zip,{byPath,bySegment})}
+function findZipEntry(zip,predicate){return zipFiles(zip).find(entry=>predicate(entry.name.split(String.fromCharCode(92)).join('/')))}
+function zipImagesInFolder(zip,folder){const key=normalizedZipPath(folder),segment=pathParts(key).at(-1)||'',prefix=key?key+'/':'';return (zipPathIndex(zip).bySegment.get(segment)||[]).filter(entry=>{const path=normalizedZipPath(entry.name);return path.startsWith(prefix)&&/\.(png|jpe?g|webp|gif|avif|bmp)$/i.test(path)}).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}))}
 function findZipEntry(zip,predicate){return zipFiles(zip).find(entry=>predicate(entry.name.split(String.fromCharCode(92)).join('/')))}
 function zipImagesInFolder(zip,folder){const key=normalizedZipPath(folder);return zipPathIndex(zip).imagesByFolder.get(key)||[]}
 function guessMime(name){
@@ -209,7 +212,7 @@ async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId,htmlPath=''
   const candidates=[base+'/'+decoded.replace(/^\.\//,''),base+'/'+filename].map(normalizedZipPath);
   const index=zipPathIndex(zip);
   const entry=candidates.map(path=>index.byPath.get(path)).find(Boolean)||
-   (index.byBase.get(normalizedZipPath(filename))||[]).find(item=>normalizedZipPath(item.name).includes('/'+String(chapterId).toLowerCase()+'/'));
+   (index.bySegment.get(String(chapterId).toLowerCase())||[]).find(item=>pathParts(item.name).at(-1)===normalizedZipPath(filename).split('/').at(-1));
   if(entry&&/^image\//i.test(guessMime(filename))){
    const bytes=await entry.async('uint8array'),mime=guessMime(filename),id=safeId();
    images.push({id,data:'data:'+mime+';base64,'+bytesToBase64(bytes),mime,name:filename});
@@ -412,6 +415,7 @@ async function readLNReaderArchive(prepared,onBook){
  const categoryNames=new Map(categories.map(category=>[Number(category.id),String(category.name||'').trim()]).filter(([,name])=>name));
  const downloadZip=prepared?.chapterArchive||prepared?.downloadZip||dataZip;
  const novelRecords=prepared?.novelRecords||[];
+ primeZipPathIndex(downloadZip,novelRecords);
  const items=[];let importedBooks=0,totalChapters=0,readableChapters=0;
  for(const record of novelRecords.length?novelRecords:novelEntries.map(entry=>({entry,novel:null}))){
   const entry=record.entry;let novel=record.novel;
