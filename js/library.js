@@ -119,7 +119,20 @@ export function drawLibrary(){
   if(!query)return true;
   if(preferAuthor)return String(b.author||'').toLocaleLowerCase().includes(query);
   return [b.title,b.author,...(b.tags||[]),...(b.chapters||[]).flatMap(ch=>[ch.title,ch.text]),...(b.gallery?.images||[]).flatMap(image=>[image.name,image.title,image.fileName])].some(value=>String(value||'').toLocaleLowerCase().includes(query));
- });const sort=$('librarySort')?.value||localStorage.getItem('qrLibrarySort')||'recent';list.sort((a,b)=>{const chars=x=>(x.chapters||[]).reduce((sum,ch)=>sum+String(ch.text||'').length,0);if(sort==='added')return stamp(b.createdAt||b.addedAt||b.importedAt||b.updated)-stamp(a.createdAt||a.addedAt||a.importedAt||a.updated);if(sort==='pinned')return Number(Boolean(b.pinned))-Number(Boolean(a.pinned))||(b.updated||0)-(a.updated||0);if(sort==='favorite')return Number(Boolean(b.favorite))-Number(Boolean(a.favorite))||(b.updated||0)-(a.updated||0);if(sort==='title')return String(a.title||'').localeCompare(String(b.title||''));if(sort==='rating-asc')return (Number(a.rating)||0)-(Number(b.rating)||0);if(sort==='rating-desc')return (Number(b.rating)||0)-(Number(a.rating)||0);if(sort==='characters-desc')return chars(b)-chars(a);if(sort==='characters-asc')return chars(a)-chars(b);return stamp(b.updated)-stamp(a.updated)});const grid=$('bookGrid');
+ });const sort=$('librarySort')?.value||localStorage.getItem('qrLibrarySort')||'recent';list.sort((a,b)=>{
+  const pinnedOrder=Number(Boolean(b.pinned))-Number(Boolean(a.pinned));
+  if(pinnedOrder)return pinnedOrder;
+  const chars=x=>(x.chapters||[]).reduce((sum,ch)=>sum+String(ch.text||'').length,0);
+  if(sort==='added')return stamp(b.createdAt||b.addedAt||b.importedAt||b.updated)-stamp(a.createdAt||a.addedAt||a.importedAt||a.updated);
+  if(sort==='pinned')return stamp(b.updated)-stamp(a.updated);
+  if(sort==='favorite')return Number(Boolean(b.favorite))-Number(Boolean(a.favorite))||(b.updated||0)-(a.updated||0);
+  if(sort==='title')return String(a.title||'').localeCompare(String(b.title||''));
+  if(sort==='rating-asc')return (Number(a.rating)||0)-(Number(b.rating)||0);
+  if(sort==='rating-desc')return (Number(b.rating)||0)-(Number(a.rating)||0);
+  if(sort==='characters-desc')return chars(b)-chars(a);
+  if(sort==='characters-asc')return chars(a)-chars(b);
+  return stamp(b.updated)-stamp(a.updated);
+ });const grid=$('bookGrid');
  grid.innerHTML='';
  const view=localStorage.getItem('qrLibraryView')||'expanded';const columns=Math.max(2,Math.min(5,Number(localStorage.getItem('qrLibraryColumns')||3)));grid.style.setProperty('--library-columns',String(columns));grid.classList.toggle('compact-view',view==='compact');grid.classList.toggle('expanded-view',view!=='compact');document.querySelectorAll('[data-library-view]').forEach(button=>{button.classList.toggle('active',button.dataset.libraryView===view);button.setAttribute('aria-pressed',String(button.dataset.libraryView===view))});
  if(!list.length){
