@@ -310,70 +310,51 @@ $('customCategoryFilters')?.addEventListener('click',event=>{
  const button=event.target.closest('[data-category-filter]');
  if(!button)return;
  state.tagFilter=button.dataset.categoryFilter;
- state.filter='all';syncHeaderActions('library');
- document.querySelectorAll('[data-filter]').forEach(item=>item.classList.toggle('active',item.dataset.filter==='all'));
+ state.filter=button.dataset.categorySource||'manual';syncHeaderActions('library');
+ document.querySelectorAll('[data-filter]').forEach(item=>item.classList.toggle('active',item.dataset.filter===state.filter));
  if($('tagFilter'))$('tagFilter').value=state.tagFilter;
  drawLibrary();
 });
 function manageLibraryCategories(){
- const readTree=()=>{
-  try{
-   const saved=JSON.parse(localStorage.getItem('qrLibraryCategoryTree')||'null');
-   if(Array.isArray(saved))return saved.map((item,index)=>({id:String(item.id||'category-'+index),name:String(item.name||'').trim(),locked:item.locked===true,subcategories:Array.isArray(item.subcategories)?item.subcategories.map((sub,subIndex)=>({id:String(sub.id||item.id+'-sub-'+subIndex),name:String(sub.name||'').trim(),locked:sub.locked===true})).filter(sub=>sub.name):[] })).filter(item=>item.name);
-  }catch{}
-  let legacy=[];try{const value=JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]');if(Array.isArray(value))legacy=value.filter(x=>typeof x==='string'&&x.trim()).map(name=>({id:'sub-'+Math.random().toString(36).slice(2,9),name:name.trim(),locked:false}))}catch{}
-  return legacy.length?[{id:'general',name:'General',locked:false,subcategories:legacy}]:[];
- };
- let categories=readTree(),selectedId=categories[0]?.id||'';
- const body='<div class="stack category-manager"><p class="muted tiny">Organize your library categories into main categories and subcategories. LN Reader categories are imported metadata and are managed separately.</p><div class="category-manager-main"><label>Main category<select id="categoryManagerSelect"></select></label><button type="button" id="addMainCategory" class="primary">＋ Main category</button></div><div class="row category-create-row"><input id="newMainCategory" placeholder="New main category name" maxlength="40"><button type="button" id="saveMainCategory">Add</button></div><section class="category-manager-subsection"><div class="row between"><div><b>Subcategories</b><p class="muted tiny">Choose a main category above to manage its subcategories.</p></div><span id="categorySubCount" class="muted tiny"></span></div><div class="row category-create-row"><input id="newSubCategory" placeholder="New subcategory name" maxlength="40"><button type="button" id="addSubCategory" class="primary">Add</button></div><div id="categorySubcategoryList" class="category-manager-list"></div></section></div>';
+ const mainCategories=[['epub','EPUB'],['manhwa','Manhwa'],['pdf','PDF'],['manual','Novels'],['gallery','Galleries']];
+ let subcategories={};
+ try{subcategories=JSON.parse(localStorage.getItem('qrLibrarySubcategories')||'{}')||{}}catch{subcategories={}}
+ if(!Object.keys(subcategories).length){
+  let legacy=[];try{const value=JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]');if(Array.isArray(value))legacy=value.filter(x=>typeof x==='string'&&x.trim())}catch{}
+  if(legacy.length)subcategories.manual=legacy.map((name,index)=>({id:'legacy-'+index+'-'+Math.random().toString(36).slice(2,6),name:String(name).trim(),locked:false}));
+ }
+ let selectedSource='manual';
+ const body='<div class="stack category-manager"><p class="muted tiny">Choose a main library category to manage its subcategories. LN Reader categories are imported from LN Reader and remain fixed here.</p><label>Main category<select id="categoryManagerSelect">'+mainCategories.map(([key,label])=>'<option value="'+key+'">'+label+'</option>').join('')+'</select></label><section class="category-manager-subsection"><div class="row between"><div><b id="categoryManagerHeading">Novels subcategories</b><p class="muted tiny">Locked subcategories cannot be removed. Unlock one to delete it.</p></div><span id="categorySubCount" class="muted tiny"></span></div><div class="row category-create-row"><input id="newSubCategory" placeholder="New subcategory name" maxlength="40"><button type="button" id="addSubCategory" class="primary">Add</button></div><div id="categorySubcategoryList" class="category-manager-list"></div></section></div>';
  modal('Manage categories',body,()=>{
   const select=$('categoryManagerSelect'),host=$('categorySubcategoryList');
   const safe=value=>String(value).replace(/[&<>"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]));
-  const current=()=>categories.find(item=>item.id===selectedId)||null;
+  const list=()=>Array.isArray(subcategories[selectedSource])?subcategories[selectedSource]:[];
   const persist=()=>{
-   categories.sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base'}));
-   localStorage.setItem('qrLibraryCategoryTree',JSON.stringify(categories));
-   const flattened=[...new Set(categories.flatMap(item=>item.subcategories.map(sub=>sub.name)))];
-   localStorage.setItem('qrLibraryCategories',JSON.stringify(flattened));
+   const all=[...new Set(Object.values(subcategories).flat().map(item=>String(item.name||'').trim()).filter(Boolean))];
+   localStorage.setItem('qrLibrarySubcategories',JSON.stringify(subcategories));
+   localStorage.setItem('qrLibraryCategories',JSON.stringify(all));
    drawLibrary();render();
   };
   const render=()=>{
-   if(!categories.some(item=>item.id===selectedId))selectedId=categories[0]?.id||'';
-   select.innerHTML=categories.map(item=>'<option value="'+safe(item.id)+'">'+safe(item.name)+(item.locked?' · locked':'')+'</option>').join('');
-   select.value=selectedId;
-   const category=current();
-   const addButton=$('addSubCategory');addButton.disabled=!category;
-   $('newSubCategory').disabled=!category;
-   $('categorySubCount').textContent=category?category.subcategories.length+' subcategories':'';
-   host.innerHTML=category?'<div class="category-manager-parent"><span class="category-dot"></span><b>'+safe(category.name)+'</b><span class="muted tiny">Main category</span><span class="grow"></span><button type="button" class="category-manager-lock '+(category.locked?'locked':'')+'" data-lock-main="'+safe(category.id)+'" aria-label="'+(category.locked?'Unlock':'Lock')+' main category">'+(category.locked?'🔒':'🔓')+'</button><button type="button" data-remove-main="'+safe(category.id)+'" '+(category.locked?'disabled':'')+'>Remove</button></div>'+(category.subcategories.length?category.subcategories.map(sub=>'<div class="category-manager-item category-manager-subcategory"><span class="category-sub-indent">↳</span><b>'+safe(sub.name)+'</b><span class="grow"></span><button type="button" class="category-manager-lock '+(sub.locked?'locked':'')+'" data-lock-sub="'+safe(sub.id)+'" aria-label="'+(sub.locked?'Unlock':'Lock')+' subcategory">'+(sub.locked?'🔒':'🔓')+'</button><button type="button" data-remove-sub="'+safe(sub.id)+'" '+(sub.locked?'disabled':'')+'>Remove</button></div>').join(''):'<p class="muted tiny">No subcategories yet. Add one above.</p>'):'<p class="muted tiny">No main categories yet. Add your first category above.</p>';
+   const label=mainCategories.find(item=>item[0]===selectedSource)?.[1]||'Library';
+   $('categoryManagerHeading').textContent=label+' subcategories';
+   $('categorySubCount').textContent=list().length+' subcategories';
+   host.innerHTML=list().length?list().map(item=>'<div class="category-manager-item category-manager-subcategory"><span class="category-sub-indent">↳</span><b>'+safe(item.name)+'</b><span class="grow"></span><button type="button" class="category-manager-lock '+(item.locked?'locked':'')+'" data-lock-sub="'+safe(item.id)+'" aria-label="'+(item.locked?'Unlock':'Lock')+' subcategory">'+(item.locked?'🔒':'🔓')+'</button><button type="button" data-remove-sub="'+safe(item.id)+'" '+(item.locked?'disabled':'')+'>Remove</button></div>').join(''):'<p class="muted tiny">No subcategories for this main category yet. Add one above.</p>';
   };
-  $('addMainCategory').onclick=()=>{$('newMainCategory').focus()};
-  $('saveMainCategory').onclick=()=>{
-   const input=$('newMainCategory'),name=input.value.trim();
-   if(!name)return toast('Enter a main category name');
-   if(categories.some(item=>item.name.toLocaleLowerCase()===name.toLocaleLowerCase()))return toast('That main category already exists');
-   const id='category-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);
-   categories.push({id,name,locked:false,subcategories:[]});selectedId=id;input.value='';persist();
-  };
-  $('newMainCategory').onkeydown=event=>{if(event.key==='Enter')$('saveMainCategory').click()};
-  select.onchange=()=>{selectedId=select.value;render()};
+  select.value=selectedSource;select.onchange=()=>{selectedSource=select.value;render()};
   $('addSubCategory').onclick=()=>{
-   const category=current(),input=$('newSubCategory'),name=input.value.trim();
-   if(!category)return toast('Create a main category first');
+   const input=$('newSubCategory'),name=input.value.trim();
    if(!name)return toast('Enter a subcategory name');
-   if(categories.some(item=>item.subcategories.some(sub=>sub.name.toLocaleLowerCase()===name.toLocaleLowerCase())))return toast('That subcategory already exists');
-   category.subcategories.push({id:'subcategory-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name,locked:false});input.value='';persist();
+   if(list().some(item=>item.name.toLocaleLowerCase()===name.toLocaleLowerCase()))return toast('That subcategory already exists in this category');
+   subcategories[selectedSource]=[...list(),{id:'subcategory-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name,locked:false}];
+   input.value='';persist();
   };
   $('newSubCategory').onkeydown=event=>{if(event.key==='Enter')$('addSubCategory').click()};
   host.onclick=event=>{
-   const lockMain=event.target.closest('[data-lock-main]');
-   if(lockMain){const item=categories.find(value=>value.id===lockMain.dataset.lockMain);if(item){item.locked=!item.locked;persist()}return}
-   const lockSub=event.target.closest('[data-lock-sub]');
-   if(lockSub){const item=categories.flatMap(value=>value.subcategories).find(value=>value.id===lockSub.dataset.lockSub);if(item){item.locked=!item.locked;persist()}return}
-   const removeMain=event.target.closest('[data-remove-main]');
-   if(removeMain){const item=categories.find(value=>value.id===removeMain.dataset.removeMain);if(!item||item.locked)return;categories=categories.filter(value=>value.id!==item.id);if(selectedId===item.id)selectedId=categories[0]?.id||'';persist();return}
-   const removeSub=event.target.closest('[data-remove-sub]');
-   if(removeSub){for(const category of categories){const item=category.subcategories.find(value=>value.id===removeSub.dataset.removeSub);if(!item||item.locked)continue;category.subcategories=category.subcategories.filter(value=>value.id!==item.id);persist();return}}
+   const lock=event.target.closest('[data-lock-sub]');
+   if(lock){const item=list().find(value=>value.id===lock.dataset.lockSub);if(item){item.locked=!item.locked;persist()}return}
+   const remove=event.target.closest('[data-remove-sub]');
+   if(remove){const item=list().find(value=>value.id===remove.dataset.removeSub);if(!item||item.locked)return;subcategories[selectedSource]=list().filter(value=>value.id!==item.id);persist()}
   };
   render();
  });
