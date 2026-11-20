@@ -1482,3 +1482,27 @@ button.primary:hover:not(:disabled){background-color:var(--accent-hover,var(--ac
 
 /* The custom hover surface applies to primary actions too; accent remains their resting color. */
 button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.actions .card-open-action:hover:not(:disabled){background:var(--hover)!important;border-color:var(--hover-border)!important;color:var(--fg)!important}
+
+/* Reader-only appearance controls and optional pinned controls */
+#screen-reader{background:var(--reader-bg,var(--bg));color:var(--reader-fg,var(--fg))}
+#screen-reader .reading-column,#screen-reader .reading-body,#screen-reader .reading-title,#screen-reader .chapter-kicker,#screen-reader .chapter-character-count{color:var(--reader-fg,var(--fg))}
+#screen-reader .reader-toolbar{background:var(--reader-bg,var(--bg))}
+.reader-toolbar.reader-toolbar-sticky{position:sticky;top:0;z-index:18}
+.reader-color-setting input[type=color]{width:44px;height:30px;padding:2px;flex:none}
+.reader-toolbar-sticky-setting{display:flex;align-items:center;gap:9px}
+.reader-toolbar-sticky-setting input{width:16px;height:16px;accent-color:var(--accent)}
+/* Hover treatment follows the selected hover color across the library. */
+:root{--hover:var(--qr-hover-color,color-mix(in srgb,var(--fg) 8%,var(--panel)))}
+.book-card:hover,.book-card:focus-within,.chapter-row:hover,.gallery-card:hover,.collection-index-card:hover,.collection-card:hover,.collection-entry:hover,.paste-entry:hover,.reading-history-entry:hover{background:var(--hover)!important;border-color:color-mix(in srgb,var(--hover) 75%,var(--line))!important;box-shadow:0 8px 22px color-mix(in srgb,var(--hover) 45%,transparent)!important}
+.library-heading:hover,.library-heading:focus-within,.gallery-toolbar:hover,.collections-heading:hover,.collections-grid:hover,.gallery-grid:hover,.collection-detail-heading:hover,.pastes-section:hover{background:var(--hover)!important}
+.filter-row button:hover,.filter-row button.active:hover,.ln-reader-category-filters button:hover,.custom-category-filters button:hover,.gallery-toolbar button:hover{background:var(--hover)!important;border-color:var(--line)!important;color:var(--fg)!important}
+/* LN Reader import history uses one contained scroll area, without a second page scrollbar. */
+.lnreader-history-backdrop{display:grid!important;place-items:center!important;overflow:hidden!important;padding:14px!important}
+.lnreader-history-modal{width:min(960px,100%)!important;max-width:960px!important;height:min(90dvh,900px)!important;max-height:90dvh!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--fg) 24%,var(--bg)) transparent}
+.lnreader-history-modal>.row{position:sticky;top:-1px;z-index:5;margin:-4px 0 12px;padding:10px 0;background:var(--panel);border-bottom:1px solid var(--line)}
+.lnreader-history-content{margin:12px auto 34px}
+.lnreader-import-report{scroll-margin-top:58px}
+.lnreader-import-report summary{position:relative;z-index:0}
+.filter-row,.ln-reader-category-filters,.custom-category-filters{row-gap:9px;align-items:center}
+.filter-row{padding-bottom:8px}
+@media(max-width:650px){.lnreader-history-backdrop{padding:8px!important}.lnreader-history-modal{height:94dvh!important;max-height:94dvh!important;padding:14px!important}}
