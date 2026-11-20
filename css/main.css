@@ -1560,3 +1560,52 @@ button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.action
 .category-manager .category-create-row{gap:8px}
 .category-manager .category-create-row input{min-width:0;flex:1}
 @media(max-width:520px){.category-manager-main{grid-template-columns:1fr}.category-manager-parent,.category-manager-subcategory{gap:6px}.category-manager-parent button,.category-manager-subcategory button{padding:6px 8px;font-size:11px}}
+
+
+/* Auto-read highlight: custom reader color must win over legacy accent overrides. */
+.auto-read-sentence{
+ background:var(--auto-read-highlight,#d7c477)!important;
+ color:#242019!important;
+ box-shadow:0 0 0 2px color-mix(in srgb,var(--auto-read-highlight,#d7c477) 76%,transparent)!important;
+}
+.reading-body.focus-active p.focus-current{
+ background:color-mix(in srgb,var(--auto-read-highlight,var(--accent)) 10%,var(--bg))!important;
+ border-left-color:var(--auto-read-highlight,var(--accent))!important;
+}
+
+/* Make every Appearance tab read as a complete, distinct button surface. */
+#modalHost:has(.appearance-tabs) .appearance-tabs{gap:7px;padding:5px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--bg) 62%,var(--panel))}
+#modalHost:has(.appearance-tabs) .appearance-tabs button{
+ min-height:38px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;
+ background:color-mix(in srgb,var(--panel) 82%,var(--bg));color:var(--fg);
+ transition:background-color .15s,border-color .15s,color .15s,box-shadow .15s;
+}
+#modalHost:has(.appearance-tabs) .appearance-tabs button:hover{
+ background:var(--hover,var(--panel2));border-color:var(--hover-border,var(--accent));color:var(--fg);
+ box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fg) 12%,transparent);
+}
+#modalHost:has(.appearance-tabs) .appearance-tabs button.active{
+ background:color-mix(in srgb,var(--accent) 18%,var(--panel));border-color:var(--accent);
+ color:var(--accent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent);
+}
+
+/* Keep the Appearance close control above the tab row, never over its last tab. */
+#modalHost:has(.appearance-tabs) .modal>.row.between{
+ position:relative;align-items:flex-start;min-height:28px;margin-bottom:24px;padding-right:44px;
+}
+#modalHost:has(.appearance-tabs) .modal>.row.between #modalClose{
+ position:absolute;right:0;top:-7px;transform:none;
+}
+
+/* Favicon picker uses the same compact Q mark as the app header. */
+.favicon-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
+.favicon-option{display:flex;align-items:center;gap:11px;min-width:0;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--panel);text-align:left}
+.favicon-option:hover,.favicon-option.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
+.favicon-option span:last-child{display:flex;flex-direction:column;gap:3px;min-width:0}
+.favicon-option small{font-size:10px;color:var(--muted)}
+.favicon-preview{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:10px;font:900 22px/1 Manrope,sans-serif}
+.favicon-preview-theme{background:var(--accent);color:var(--bg)}
+.favicon-preview-classic{background:#474747;color:#BABABF}
+.favicon-preview-mono{background:var(--fg);color:var(--bg)}
+.favicon-preview-upload{background:var(--panel2);color:var(--accent);border:1px dashed var(--line)}
+@media(max-width:430px){.favicon-options{grid-template-columns:1fr}}
