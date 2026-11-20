@@ -18,7 +18,26 @@ function rememberColor(key,color){
   localStorage.setItem(key,JSON.stringify(next));
  }catch(error){console.warn('Could not save appearance color history',error)}
 }
-function setFavicon(){const link=document.querySelector('link[rel~="icon"]');if(link)link.href='assets/favicon.svg'}
+function setFavicon(){
+ const link=document.querySelector('link[rel~="icon"]');
+ if(!link)return;
+ const mode=localStorage.getItem('qrFaviconMode')||'theme';
+ const custom=localStorage.getItem('qrCustomFavicon');
+ if(mode==='custom'&&custom){link.href=custom;return}
+ const palette=palettes[localStorage.getItem('qbtheme')||'default']||palettes.default;
+ let background=localStorage.getItem('qrAccent')||palette.accent;
+ let foreground=localStorage.getItem('qrBackground')||palette.bg;
+ if(mode==='classic'){background='#474747';foreground='#BABABF'}
+ if(mode==='mono'){background=palette.fg;foreground=palette.bg}
+ const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="2" y="2" width="60" height="60" rx="15" fill="'+background+'"/><text x="32" y="47" text-anchor="middle" font-family="Manrope,Arial,sans-serif" font-size="45" font-weight="800" fill="'+foreground+'">q</text></svg>';
+ link.href='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+}
+export function applyFaviconMode(mode){
+ const allowed=['theme','classic','mono','custom'];
+ const value=allowed.includes(mode)?mode:'theme';
+ localStorage.setItem('qrFaviconMode',value);
+ setFavicon();
+}
 export function applyAccent(color,remember=true){
  const value=/^#[0-9a-f]{6}$/i.test(color)?color:'#b9f27c';
  document.documentElement.style.setProperty('--accent',value);
