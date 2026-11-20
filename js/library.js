@@ -95,14 +95,14 @@ export async function refresh(){const items=await getAll();state.books=items.fil
 export function drawLibrary(){
  document.body.classList.toggle('collection-fullscreen',state.filter==='collections'&&Boolean(state.collectionId));
  $('bookGrid')?.classList.toggle('collection-workspace',state.filter==='collections');
- const entryDefaults=[['all','All entries'],['epub','EPUB'],['manhwa','Manhwa'],['pdf','PDF'],['manual','Novels'],['gallery','Galleries']];
+ const entryDefaults=[['all','All entries'],['epub','EPUB'],['manhwa','Manhwa'],['pdf','PDF'],['manual','Novels'],['gallery','Galleries'],['lnreader','LN Reader']];
  let entryConfig={};try{entryConfig=JSON.parse(localStorage.getItem('qrLibraryEntryConfig')||'{}')||{}}catch{entryConfig={}}
  document.querySelectorAll('#libraryEntryTabs [data-filter]').forEach(button=>{const key=button.dataset.filter,config=entryConfig[key]||{},label=config.label||entryDefaults.find(item=>item[0]===key)?.[1]||key;let textNode=[...button.childNodes].find(node=>node.nodeType===Node.TEXT_NODE);if(textNode)textNode.nodeValue=label;else button.insertBefore(document.createTextNode(label),button.querySelector('.filter-count')||button.firstChild);button.classList.toggle('hidden',config.visible===false)});
  const savedCategories=(()=>{try{const value=JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]');return Array.isArray(value)?value.filter(x=>typeof x==='string'&&x.trim()):[]}catch{return []}})();
  const availableTags=[...new Set([...state.books.flatMap(b=>Array.isArray(b.tags)?b.tags:[]).map(t=>String(t).trim()).filter(Boolean),...savedCategories])].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
  const tagSelect=$('tagFilter');
  if(tagSelect){const selected=state.tagFilter||'all';tagSelect.innerHTML='<option value="all">All tags</option>'+availableTags.map(t=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join('');tagSelect.value=availableTags.includes(selected)?selected:'all';state.tagFilter=tagSelect.value}
- const categoryHost=$('customCategoryFilters');if(categoryHost){categoryHost.innerHTML=savedCategories.filter(tag=>entryConfig['tag:'+tag]?.visible!==false).map(tag=>'<button type="button" data-category-filter="'+esc(tag)+'" class="'+(state.tagFilter===tag?'active':'')+'">'+esc(entryConfig['tag:'+tag]?.label||tag)+'</button>').join('')}
+ const categoryHost=$('customCategoryFilters');if(categoryHost){categoryHost.innerHTML=savedCategories.filter(tag=>entryConfig['tag:'+tag]?.visible!==false).map(tag=>'<button type="button" data-category-filter="'+esc(tag)+'" class="'+(state.tagFilter===tag?'active':'')+'">'+esc(entryConfig['tag:'+tag]?.label||tag)+'</button>').join('')}\n const lnCategoryHost=$('lnReaderCategoryFilters');const lnCategories=[...new Set(state.books.filter(book=>book.source==='lnreader').flatMap(book=>book.lnReader?.categories||[]).map(value=>String(value||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));if(lnCategoryHost){lnCategoryHost.innerHTML=state.filter==='lnreader'?'<button type="button" data-lnreader-category="all" class="'+(state.lnReaderCategory==='all'?'active':'')+'">All LN Reader</button>'+lnCategories.map(category=>'<button type="button" data-lnreader-category="'+esc(category)+'" class="'+(state.lnReaderCategory===category?'active':'')+'">'+esc(category)+'</button>').join(''):'';lnCategoryHost.classList.toggle('hidden',state.filter!=='lnreader')}
  const query=librarySearchQuery.trim().toLocaleLowerCase();
  const stamp=value=>typeof value==='number'?value:(Date.parse(value)||Number(value)||0);
  if(state.filter==='collections'){document.querySelector('.filter-row')?.classList.add('hidden');drawCollections($('bookGrid'));$('pasteList').innerHTML='';$('pastesSection')?.classList.add('hidden');return}
@@ -110,7 +110,7 @@ export function drawLibrary(){
  const authorMatches=query?state.books.filter(b=>String(b.author||'').toLocaleLowerCase().includes(query)):[];
  const preferAuthor=authorMatches.length>0;
  const list=state.books.filter(b=>{
-  if(state.filter==='gallery'&&b.source!=='gallery')return false;if(state.filter==='manual'&&!['manual','lnreader'].includes(b.source))return false;if(state.filter==='manhwa'&&b.source!=='manhwa')return false;if(state.filter!=='all'&&state.filter!=='gallery'&&state.filter!=='manual'&&state.filter!=='manhwa'&&b.source!==state.filter)return false;
+  if(state.filter==='gallery'&&b.source!=='gallery')return false;if(state.filter==='manual'&&b.source!=='manual')return false;if(state.filter==='lnreader'&&b.source!=='lnreader')return false;if(state.filter==='manhwa'&&b.source!=='manhwa')return false;if(state.filter!=='all'&&state.filter!=='gallery'&&state.filter!=='manual'&&state.filter!=='lnreader'&&state.filter!=='manhwa'&&b.source!==state.filter)return false;if(state.filter==='lnreader'&&state.lnReaderCategory!=='all'&&!(b.lnReader?.categories||[]).includes(state.lnReaderCategory))return false;
   if(state.tagFilter!=='all'&&!(b.tags||[]).includes(state.tagFilter))return false;
   if(!query)return true;
   if(preferAuthor)return String(b.author||'').toLocaleLowerCase().includes(query);
