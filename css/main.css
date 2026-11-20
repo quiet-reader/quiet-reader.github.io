@@ -88,7 +88,7 @@ body:has(#readerPanel:not(.hidden)) #readerMenuBtn{background:var(--panel2);bord
 .reader-toolbar>button{min-height:38px}
 .reader-toolbar #autoReadStart{font-weight:600}
 .reader-book-title{font-size:13px;max-width:min(42vw,480px);font-weight:600;color:var(--fg)}
-.reader-panel{padding:20px 18px 30px;background:var(--panel);border-right:1px solid var(--line);box-shadow:12px 0 36px #0005}
+.reader-panel{padding:20px 18px 30px;background:var(--panel);border-right:1px solid var(--line);box-shadow:12px 0 36px #0005;overflow-y:auto;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--fg) 24%,var(--bg)) transparent}
 .reader-settings-group{padding:13px 12px;margin:8px 0 15px;background:color-mix(in srgb,var(--bg) 45%,var(--panel));border:1px solid var(--line);border-radius:12px}
 .reader-settings-group h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
 .reader-settings-group label{margin:12px 0 8px}
@@ -215,7 +215,7 @@ select:focus{animation:select-focus-in .2s ease both}
 .select-popover-trigger{display:flex;align-items:center;justify-content:space-between;gap:20px;min-width:0;width:100%;padding:7px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg);font-size:13px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .select-popover-trigger::after{content:"";flex:none;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-2px);transition:transform .18s}
 .select-popover-trigger[aria-expanded="true"]{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 18%,transparent)}
-.select-popover-trigger[aria-expanded="true"]::after{transform:rotate(225deg) translate(-1px,-1px)}
+.select-popover-trigger[aria-expanded="true"]::after{transform:rotate(45deg) translateY(-2px)}
 .select-popover{position:absolute;z-index:85;top:calc(100% + 7px);left:0;right:auto;min-width:max(100%,190px);width:max-content;max-width:min(290px,calc(100vw - 16px));max-height:280px;overflow:auto;padding:6px;background:var(--panel);border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:10px;box-shadow:0 12px 32px #0008;transform-origin:top left;animation:select-pop-in .16s ease both}
 .select-popover.hidden{display:none!important}
 .select-popover button{display:block;width:100%;text-align:left;padding:8px 10px;margin:2px 0;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--fg);font-size:12px;white-space:normal}
@@ -1464,3 +1464,18 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 html.has-custom-text-color body :is(h1,h2,h4,p,label,small,li,.book-title,.book-subtitle,.detail-author,.chapter-name,.reading-body,.reader-book-title,.chapter-kicker,.chapter-character-count,.card-updated,.drawer-footnote,.drawer-head,.reader-settings-group,.reading-history-entry,.saved-mark-item,.empty,.empty-state h2,.empty-state p,.section-heading h2,.book-detail h1,.book-detail p,.novel-search-result,.novel-search-result span,.collection-card-open b,.collection-entry-copy){color:var(--fg)!important}
 html.has-custom-text-color body .reader-panel h3,html.has-custom-text-color body .appearance-history-heading{color:var(--accent)!important}
 button.primary:hover,.primary-button:hover,.actions .card-open-action:hover{background:var(--accent)!important;border-color:var(--accent)!important;color:#202020!important}
+
+/* Quiet grey hover surfaces, shared by library cards, galleries and collections. */
+:root{--hover:color-mix(in srgb,var(--fg) 8%,var(--panel));--hover-border:color-mix(in srgb,var(--fg) 20%,var(--line))}
+button:hover:not(:disabled){background-color:var(--hover);border-color:var(--hover-border);filter:none}
+button.primary:hover:not(:disabled){background-color:var(--accent-hover,var(--accent));border-color:var(--accent);color:var(--fg)}
+.book-card:hover,.book-card:focus-within,.gallery-card:hover,.gallery-card:focus-visible{border-color:var(--hover-border);box-shadow:0 0 0 1px var(--hover-border),0 12px 28px #0004}
+.collection-card:hover,.collection-card:focus-within{background:var(--hover);border-color:var(--hover-border)}
+.collection-card-open:hover{background:var(--hover)}
+.collection-entry:hover,.collection-picker-item:hover{background:var(--hover);border-color:var(--hover-border)}
+.reader-panel,#screen-reader,.reader-settings-group{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--fg) 24%,var(--bg)) transparent}
+.reader-panel::-webkit-scrollbar,#screen-reader::-webkit-scrollbar,.reader-settings-group::-webkit-scrollbar{width:5px;height:5px}
+.reader-panel::-webkit-scrollbar-track,#screen-reader::-webkit-scrollbar-track,.reader-settings-group::-webkit-scrollbar-track{background:transparent}
+.reader-panel::-webkit-scrollbar-thumb,#screen-reader::-webkit-scrollbar-thumb,.reader-settings-group::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--fg) 22%,var(--bg));border-radius:20px;border:1px solid var(--bg)}
+.history-lock-toggle{display:inline-flex;align-items:center;gap:7px}
+.history-lock-toggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
