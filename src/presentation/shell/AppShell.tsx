@@ -1,3 +1,5 @@
+import { OfflineUpdates } from "@/features/offline-updates/OfflineUpdates";
+
 export function AppShell() {
   return (
     <main className="app-shell">
@@ -17,6 +19,7 @@ export function AppShell() {
           <li>Preserve ZIP backups and legacy QuietBookBackup JSON versions 2 and 3.</li>
           <li>Migrate features incrementally without changing their user-visible behaviour.</li>
         </ul>
+        <OfflineUpdates />
       </section>
     </main>
   );
