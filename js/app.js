@@ -1,4 +1,4 @@
-import {$,esc,toast,modal,closeModal,dataURL} from './utils.js';import {state,setScreen} from './state.js';import {refresh,drawBook,drawLibrary,openBook,createNovel,handleLibraryClick,savePasteAsBook,savePasteOnly,setBookTab,saveBookNotes,setLibraryView,setLibrarySearch,showChapterHistory,handleCollectionAction} from './library.js';import {editChapter,saveChapter,deleteChapter,insertImage,importTextBook,importTextChapters} from './editor.js';import {openReader,drawReader,saveProgress,changeChapter,jumpChapter,addBookmark,renderChapterFormat,copySection,copyChapter,toggleSection,startAutoRead,pauseAutoRead,stopAutoRead,setAutoReadPosition,isAutoReadSpeaking,setAutoReadSpeed,setTTSSpeechSpeed,searchNovel,showMoreNovelSearchResults,openNovelSearchResult,initTTS,setTTSEnabled,setTTSVoice,setTTSEngine} from './reader.js';import {addHighlight,addParagraphHighlight,showMarks,positionSelectionToolbar,hideSelectionToolbar,bookmarkFromSelection} from './highlights.js';import {applyTheme,applyAccent,applyBackground,applyTextColor,initTheme} from './themes.js';import {exportBackup,importBackup,importZipCollection} from './backup.js';import {importEPUB,exportEPUB} from './epub.js';import {importPDF} from './pdf.js';import {put} from './db.js';import {manageNovelLinks,manageChapterLinks,renderReaderLinks,openLinkedChapter} from './links.js';import {manageTranslationSources,openTranslatePage,restoreOriginalChapter,copyTranslatedChapter,syncTranslationControls} from './translation.js';import {renameChapters} from './chapter-tools.js';import {showUniversalHistory} from './history.js';import {createGallery,addGalleryImages,addGalleryFolder,importGalleryFiles,renderGallery,continueGallery,pasteGalleryImages} from './galleries.js';import {pasteEditorImage} from './editor.js';import {addEditEvent} from './history.js';import {confirmImagePreview} from './image-preview.js';
+import {$,esc,toast,modal,closeModal,dataURL} from './utils.js';import {state,setScreen} from './state.js';import {refresh,drawBook,drawLibrary,openBook,createNovel,handleLibraryClick,savePasteAsBook,savePasteOnly,setBookTab,saveBookNotes,setLibraryView,setLibrarySearch,showChapterHistory,handleCollectionAction} from './library.js';import {editChapter,saveChapter,deleteChapter,insertImage,importTextBook,importTextChapters} from './editor.js';import {openReader,drawReader,saveProgress,changeChapter,jumpChapter,addBookmark,renderChapterFormat,copySection,copyChapter,toggleSection,startAutoRead,pauseAutoRead,stopAutoRead,setAutoReadPosition,isAutoReadSpeaking,isAutoReadActive,setAutoReadSpeed,setTTSSpeechSpeed,searchNovel,showMoreNovelSearchResults,openNovelSearchResult,initTTS,setTTSEnabled,setTTSVoice,setTTSEngine} from './reader.js';import {addHighlight,addParagraphHighlight,showMarks,positionSelectionToolbar,hideSelectionToolbar,bookmarkFromSelection} from './highlights.js';import {applyTheme,applyAccent,applyBackground,applyTextColor,initTheme} from './themes.js';import {exportBackup,importBackup,importZipCollection} from './backup.js';import {importEPUB,exportEPUB} from './epub.js';import {importPDF} from './pdf.js';import {put} from './db.js';import {manageNovelLinks,manageChapterLinks,renderReaderLinks,openLinkedChapter} from './links.js';import {manageTranslationSources,openTranslatePage,restoreOriginalChapter,copyTranslatedChapter,syncTranslationControls} from './translation.js';import {renameChapters} from './chapter-tools.js';import {showUniversalHistory} from './history.js';import {createGallery,addGalleryImages,addGalleryFolder,importGalleryFiles,renderGallery,continueGallery,pasteGalleryImages} from './galleries.js';import {pasteEditorImage} from './editor.js';import {addEditEvent} from './history.js';import {confirmImagePreview} from './image-preview.js';
 function enhanceSelects(root=document){
  root.querySelectorAll?.('select').forEach(select=>{
   if(select.dataset.customized==='1')return;select.dataset.customized='1';
@@ -164,7 +164,7 @@ $('archiveRestoreBtn').onclick=()=>{closeDrawer();$('archiveFile').click()};
 $('restoreFile').onchange=async e=>{if(e.target.files[0])await importBackup(e.target.files[0]);e.target.value=''};
 $('lnReaderBackupFile').onchange=async e=>{if(e.target.files.length)await importBackup([...e.target.files]);e.target.value=''};$('lnReaderFolderFiles').onchange=async e=>{if(e.target.files.length)await importBackup([...e.target.files]);e.target.value=''};
 $('archiveFile').onchange=async e=>{if(e.target.files[0])try{await importZipCollection(e.target.files[0],'library')}catch(error){alert('Could not import ZIP: '+(error?.message||error))}e.target.value=''};
-const readFromHere=$('readFromHere');readFromHere.classList.add('hidden');const readingBody=$('readingBody');const selectionBar=$('selectionToolbar');function canReadFromHere(){return state.screen==='reader'&&$('ttsEnabled')?.checked&&isAutoReadSpeaking()}readingBody.addEventListener('pointerover',e=>{const p=e.target.closest('p');if(!p||!readingBody.contains(p)||e.pointerType==='touch'||!canReadFromHere())return;p.classList.add('read-from-here-hover')});readingBody.addEventListener('pointerout',e=>{const p=e.target.closest('p');if(p&&!p.contains(e.relatedTarget))p.classList.remove('read-from-here-hover')});readingBody.addEventListener('click',e=>{const p=e.target.closest('p');if(!p||!readingBody.contains(p)||!canReadFromHere())return;const index=[...readingBody.querySelectorAll('p')].indexOf(p);if(index<0)return;setAutoReadPosition(index)});let selectionTimer,savedSelectionRange=null,activeParagraph=null;
+const readFromHere=$('readFromHere');readFromHere.classList.add('hidden');const readingBody=$('readingBody');const selectionBar=$('selectionToolbar');function canReadFromHere(){return state.screen==='reader'&&isAutoReadActive()}readingBody.addEventListener('pointerover',e=>{const p=e.target.closest('p');if(!p||!readingBody.contains(p)||e.pointerType==='touch'||!canReadFromHere())return;p.classList.add('read-from-here-hover')});readingBody.addEventListener('pointerout',e=>{const p=e.target.closest('p');if(p&&!p.contains(e.relatedTarget))p.classList.remove('read-from-here-hover')});readingBody.addEventListener('click',e=>{const p=e.target.closest('p');if(!p||!readingBody.contains(p)||!canReadFromHere())return;const index=[...readingBody.querySelectorAll('p')].indexOf(p);if(index<0)return;setAutoReadPosition(index)});let selectionTimer,savedSelectionRange=null,activeParagraph=null;
 function rememberSelection(){const selection=getSelection();if(selection&&!selection.isCollapsed&&selection.rangeCount){const range=selection.getRangeAt(0);if(readingBody.contains(range.commonAncestorContainer))savedSelectionRange=range.cloneRange()}}
 function showParagraphToolbar(paragraph){if(!paragraph)return;activeParagraph=paragraph;const bar=$('selectionToolbar'),rect=paragraph.getBoundingClientRect();bar.classList.remove('hidden');const width=bar.offsetWidth,height=bar.offsetHeight;let left=rect.left+rect.width/2;left=Math.max(width/2+10,Math.min(innerWidth-width/2-10,left));let top=rect.top-height-10;if(top<8)top=Math.min(innerHeight-height-8,rect.bottom+10);bar.style.left=left+'px';bar.style.top=Math.max(8,top)+'px'}
 document.addEventListener('selectionchange',()=>{rememberSelection();clearTimeout(selectionTimer);selectionTimer=setTimeout(()=>{if(state.screen==='reader')positionSelectionToolbar()},180)});
@@ -194,6 +194,7 @@ await refresh();enhanceSelects();initTheme();initTTS();setTTSEngine();const APP_
 const APP_BUILD_COMMIT=import.meta.env?.VITE_APP_COMMIT||'development';
 const APP_BUILD_SHELL=import.meta.env?.VITE_APP_SHELL||'unknown';
 let appUpdateRegistration=null;
+let appUpdateCheckPromise=null;
 let reloadAfterAppUpdate=false;
 const updateStatusNodes=()=>[...document.querySelectorAll('#appUpdateStatus,[data-app-update-status]')];
 const updateInstallNodes=()=>[...document.querySelectorAll('#installAppUpdate,[data-app-update-install]')];
@@ -212,35 +213,39 @@ function refreshAppUpdateStatus(){
  installs.forEach(button=>button.disabled=true);
 }
 async function checkForAppUpdate(){
- if(!appUpdateRegistration){setAppUpdateStatus('Service worker is not ready yet.');return}
- if(!navigator.onLine){setAppUpdateStatus('Connect to the internet to check the published GitHub version.');return}
- setAppUpdateStatus('Reading the latest published GitHub build…');
- let published;
- try{
-  const response=await fetch('./version.json?check='+Date.now(),{cache:'no-store'});
-  if(!response.ok)throw new Error('Published version metadata returned HTTP '+response.status);
-  published=await response.json();
-  if(!published.version||!published.commit)throw new Error('Published version metadata is incomplete.');
- }catch(error){
-  setAppUpdateStatus('Could not read the published GitHub version. Installed v'+APP_BUILD_VERSION+' · commit '+APP_BUILD_COMMIT+' remains unchanged. '+(error?.message||''));
-  return;
- }
- renderPublishedAppVersion(published);
- setAppUpdateStatus('Version verified. Comparing installed commit '+APP_BUILD_COMMIT+' with GitHub commit '+published.commit+'…');
- let updateError=null;
- try{await appUpdateRegistration.update()}catch(error){updateError=error}
- refreshAppUpdateStatus();
- if(appUpdateRegistration.waiting){setAppUpdateStatus('GitHub has v'+published.version+' ('+published.commit+'). The update is downloaded and ready to install.');return}
- if(appUpdateRegistration.installing){setAppUpdateStatus('GitHub has v'+published.version+' ('+published.commit+'). The matching offline app shell is downloading.');return}
- if(published.commit!==APP_BUILD_COMMIT){
-  setAppUpdateStatus('Update available · GitHub v'+published.version+' ('+published.commit+') is newer than installed v'+APP_BUILD_VERSION+'. '+(updateError?'The version was verified, but the browser could not check the offline update: '+(updateError.message||updateError):'Keep the app online and check again shortly.'));
-  return;
- }
- if(updateError){
-  setAppUpdateStatus('Version verified · installed v'+APP_BUILD_VERSION+' matches GitHub v'+published.version+' · commit '+published.commit+'. The offline service-worker update check failed: '+(updateError.message||updateError));
-  return;
- }
- setAppUpdateStatus('Up to date · installed v'+APP_BUILD_VERSION+' matches GitHub v'+published.version+' · commit '+published.commit+'.');
+ if(appUpdateCheckPromise)return appUpdateCheckPromise;
+ appUpdateCheckPromise=(async()=>{
+  if(!navigator.onLine){setAppUpdateStatus('Connect to the internet to check the published GitHub version.');return}
+  setAppUpdateStatus('Reading the latest published GitHub build…');
+  let published;
+  try{
+   const response=await fetch('./version.json?check='+Date.now(),{cache:'no-store'});
+   if(!response.ok)throw new Error('Published version metadata returned HTTP '+response.status);
+   published=await response.json();
+   if(!published.version||!published.commit)throw new Error('Published version metadata is incomplete.');
+  }catch(error){
+   setAppUpdateStatus('Could not read the published GitHub version. Installed v'+APP_BUILD_VERSION+' remains unchanged. '+(error?.message||''));
+   return;
+  }
+  renderPublishedAppVersion(published);
+  const sameBuild=published.commit===APP_BUILD_COMMIT,registration=appUpdateRegistration;
+  if(!registration){setAppUpdateStatus((sameBuild?'Up to date':'Update available')+' · GitHub v'+published.version+' ('+published.commit+'). '+(sameBuild?'Installed v'+APP_BUILD_VERSION+' matches the published build.':'Keep the app online; the browser will prepare the offline update when its service worker is ready.'));return}
+  if(registration.waiting){setAppUpdateStatus('Update downloaded · GitHub v'+published.version+' is ready to install.');return}
+  if(registration.installing){setAppUpdateStatus('Version verified · GitHub v'+published.version+'. The offline update is already installing.');return}
+  if(!registration.active||registration.active.state!=='activated'){setAppUpdateStatus((sameBuild?'Up to date':'Update available')+' · GitHub version verified. The offline app worker is still starting; check again after it becomes active.');return}
+  try{await registration.update()}catch(error){
+   const invalidState=error?.name==='InvalidStateError'||/invalid state|uninstalling/i.test(error?.message||'');
+   if(!invalidState)console.warn('Quiet Reader service-worker update check:',error);
+   if(registration.waiting||registration.installing){setAppUpdateStatus('Version verified · GitHub v'+published.version+'. The offline update is being prepared.');return}
+   setAppUpdateStatus((sameBuild?'Up to date':'Update available')+' · GitHub v'+published.version+' ('+published.commit+'). '+(invalidState?'The browser is completing a service-worker transition; the version check itself succeeded.':'The browser deferred the offline update check; the published version was verified.'));
+   return;
+  }
+  refreshAppUpdateStatus();
+  if(registration.waiting){setAppUpdateStatus('Update downloaded · GitHub v'+published.version+' is ready to install.');return}
+  if(registration.installing){setAppUpdateStatus('Version verified · GitHub v'+published.version+'. The offline update is downloading.');return}
+  setAppUpdateStatus(sameBuild?'Up to date · installed v'+APP_BUILD_VERSION+' matches GitHub v'+published.version+'.':'Update available · GitHub v'+published.version+' ('+published.commit+') is newer than installed v'+APP_BUILD_VERSION+'. Keep the app online and check again shortly.');
+ })();
+ try{return await appUpdateCheckPromise}finally{appUpdateCheckPromise=null}
 }
 function installAppUpdate(){
  if(!appUpdateRegistration?.waiting)return;
@@ -257,7 +262,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   watch(registration.installing);
   registration.addEventListener('updatefound',()=>{watch(registration.installing);refreshAppUpdateStatus()});
   navigator.serviceWorker.addEventListener('controllerchange',()=>{refreshAppUpdateStatus();if(reloadAfterAppUpdate)location.reload()});
-  registration.update().catch(()=>{});
+  if(!registration.installing&&registration.active?.state==='activated')registration.update().catch(error=>{if(error?.name!=='InvalidStateError')console.warn('Quiet Reader startup update check:',error)});
   refreshAppUpdateStatus();
  }).catch(()=>setAppUpdateStatus('Offline updates are unavailable in this browser context.'));
 }
