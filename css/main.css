@@ -1367,3 +1367,10 @@ body.collection-fullscreen #screen-library .filter-row,body.collection-fullscree
 body.detail-header-hidden .book-detail{display:none!important}
 
 .collection-items-grid>.empty-state{grid-column:1/-1}
+
+
+.app-update-group{margin-top:14px;padding-top:14px;border-top:1px solid var(--line, var(--border))}
+.app-update-actions{display:flex;flex-wrap:wrap;gap:8px}
+.app-update-actions button{font:inherit}
+.app-update-actions button:disabled{opacity:.45;cursor:not-allowed}
+.app-update-group>p{line-height:1.5}
