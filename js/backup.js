@@ -6,7 +6,7 @@ import {importEPUB} from './epub.js';
 import {importPDF} from './pdf.js';
 import {importTextBook} from './editor.js';
 import {applyTheme} from './themes.js';
-import {$,download,toast,modal,closeModal,dataURL,uid} from './utils.js';
+import {$,esc,download,toast,modal,closeModal,dataURL,uid} from './utils.js';
 
 const ARCHIVE_FORMAT='QuietReaderArchive';
 const ARCHIVE_VERSION=1;
@@ -299,21 +299,56 @@ async function readDownloadedChapter(downloadZip,pluginId,novelId,chapter,index)
  }
  return {text,images};
 }
-async function readLNReaderArchive(file){
+const lnReaderPreparedCache=new WeakMap();
+function readableSize(bytes){if(bytes<1024)return bytes+' B';if(bytes<1048576)return (bytes/1024).toFixed(1)+' KB';return (bytes/1048576).toFixed(2)+' MB'}
+async function inspectLNReaderArchive(file){
+ if(!window.JSZip)throw new Error('The ZIP library did not load. Check your connection and retry.');
  const outer=await JSZip.loadAsync(file);
+ if(outer.file('manifest.json'))return {quietReader:true};
  const dataEntry=findZipEntry(outer,name=>pathParts(name).at(-1)==='data.zip');
- if(!dataEntry)throw new Error('This ZIP is not a recognised LNReader backup. Expected data.zip and download.zip.');
+ if(!dataEntry)throw new Error('Could not find data.zip. Select the complete LN Reader backup ZIP.');
  const dataZip=await JSZip.loadAsync(await dataEntry.async('uint8array'));
- const novelEntries=zipFiles(dataZip).filter(entry=>normalizedZipPath(entry.name).includes('novelandchapters/')&&/\.json$/i.test(entry.name));
- if(!novelEntries.length)throw new Error('The LNReader data.zip archive has no NovelAndChapters JSON records.');
+ const dataFiles=zipFiles(dataZip);
+ const novelEntries=dataFiles.filter(entry=>normalizedZipPath(entry.name).includes('novelandchapters/')&&/\.json$/i.test(entry.name));
+ const novelRecords=[];
+ for(const entry of novelEntries){try{const novel=JSON.parse(await entry.async('string'));if(novel&&typeof novel==='object'&&Array.isArray(novel.chapters))novelRecords.push({entry,novel})}catch{}}
  const categoryEntry=findZipEntry(dataZip,name=>pathParts(name).at(-1)==='category.json');
  let categories=[];if(categoryEntry){try{const parsed=JSON.parse(await categoryEntry.async('string'));categories=Array.isArray(parsed)?parsed:[]}catch{}}
- const categoryNames=new Map(categories.map(category=>[Number(category.id),String(category.name||'').trim()]).filter(([,name])=>name));
  const downloadEntry=findZipEntry(outer,name=>pathParts(name).at(-1)==='download.zip');
  const downloadZip=downloadEntry?await JSZip.loadAsync(await downloadEntry.async('uint8array')):null;
+ const settingsFiles=[...zipFiles(outer),...dataFiles].filter(entry=>/\.json$/i.test(entry.name)&&/(settings|plugin|version|config)/i.test(entry.name)).map(entry=>entry.name);
+ const chapters=novelRecords.reduce((sum,record)=>sum+record.novel.chapters.length,0);
+ const missing=[];
+ if(!novelRecords.length)missing.push('Novel details (NovelAndChapters JSON)');
+ if(!categoryEntry)missing.push('category.json (LN Reader categories will not be created)');
+ if(!downloadZip)missing.push('download.zip (chapter text and downloaded images may be absent)');
+ const report={outer,dataZip,downloadZip,novelEntries,novelRecords,categories,categoryEntry,settingsFiles,chapters,outerCount:zipFiles(outer).length,dataCount:dataFiles.length,downloadCount:downloadZip?zipFiles(downloadZip).length:0,missing,size:Number(file.size)||0};
+ lnReaderPreparedCache.set(file,report);
+ return report;
+}
+function showLNReaderPreflight(file,report){
+ const categoryNames=report.categories.map(category=>String(category.name||'').trim()).filter(Boolean);
+ const settings=report.settingsFiles.length?report.settingsFiles.map(name=>'<li>'+esc(name)+'</li>').join(''):'<li>No settings, plugin settings, or version JSON detected</li>';
+ const missing=report.missing.length?'<ul class="muted tiny">'+report.missing.map(item=>'<li>'+esc(item)+'</li>').join('')+'</ul>':'<p class="muted tiny">No missing core files detected.</p>';
+ const html='<div class="stack"><p class="muted tiny">Preflight inspection only. Nothing has been added to your library yet.</p><div class="modal-item"><b>Archive</b><p>'+esc(file.name||'LN Reader backup')+' · '+readableSize(report.size)+'</p><p>'+report.outerCount+' outer entries · '+report.dataCount+' data entries · '+report.downloadCount+' downloaded entries</p></div><div class="modal-item"><b>Detected content</b><p>'+report.novelRecords.length+' novels · '+report.chapters+' chapter records · '+report.categories.length+' categories</p><p>'+(categoryNames.length?categoryNames.map(esc).join(', '):'No categories found')+'</p></div><div class="modal-item"><b>Settings and app metadata</b><ul class="tiny">'+settings+'</ul></div><div class="modal-item"><b>Verification notes</b>'+missing+'</div><p class="muted tiny">This inspection verifies archive structure and readable metadata JSON. It does not yet validate every chapter payload or image byte. Keep the original backup unchanged.</p><div class="row"><span class="grow"></span><button type="button" id="cancelLNReaderPreflight">Cancel</button><button type="button" class="primary" id="confirmLNReaderPreflight" '+(!report.novelRecords.length?'disabled':'')+'>Import detected content</button></div></div>';
+ modal('Review LN Reader backup',html,()=>{$('cancelLNReaderPreflight').onclick=closeModal;$('confirmLNReaderPreflight').onclick=()=>{closeModal();void importBackup(file,{prepared:report})}});
+}
+async function readLNReaderArchive(file,prepared=lnReaderPreparedCache.get(file)){
+ const outer=prepared?.outer||await JSZip.loadAsync(file);
+ const dataEntry=prepared?null:findZipEntry(outer,name=>pathParts(name).at(-1)==='data.zip');
+ const dataZip=prepared?.dataZip||(dataEntry?await JSZip.loadAsync(await dataEntry.async('uint8array')):null);
+ if(!dataZip)throw new Error('This ZIP is not a recognised LN Reader backup. Expected data.zip or an extracted data folder.');
+ const novelEntries=prepared?.novelEntries||zipFiles(dataZip).filter(entry=>normalizedZipPath(entry.name).includes('novelandchapters/')&&/\.json$/i.test(entry.name));
+ const categoryEntry=prepared?.categoryEntry||findZipEntry(dataZip,name=>pathParts(name).at(-1)==='category.json');
+ const categories=prepared?.categories||[];
+ const categoryNames=new Map(categories.map(category=>[Number(category.id),String(category.name||'').trim()]).filter(([,name])=>name));
+ const downloadEntry=prepared?null:findZipEntry(outer,name=>pathParts(name).at(-1)==='download.zip');
+ const downloadZip=prepared?.downloadZip||(downloadEntry?await JSZip.loadAsync(await downloadEntry.async('uint8array')):null);
+ const novelRecords=prepared?.novelRecords||[];
  const items=[];
- for(const entry of novelEntries){
-  let novel;try{novel=JSON.parse(await entry.async('string'))}catch{continue}
+ for(const record of novelRecords.length?novelRecords:novelEntries.map(entry=>({entry,novel:null}))){
+  const entry=record.entry;let novel=record.novel;
+  if(!novel){try{novel=JSON.parse(await entry.async('string'))}catch{continue}}
   if(!novel||typeof novel!=='object'||!Array.isArray(novel.chapters))continue;
   const id=String(novel.id??pathParts(entry.name).at(-1)?.replace(/\.json$/i,'')??'');
   const pluginId=String(novel.pluginId||pathParts(entry.name).find((part,index,parts)=>part.toLowerCase()==='novelandchapters'?false:parts[index+1]?.toLowerCase()==='novelandchapters')||'local');
@@ -462,13 +497,17 @@ function applyPreferences(data){
   }
  }
 }
-export async function importBackup(file){
+export async function importBackup(file,options={}){
  try{
   let restored;
   if(String(file.name||'').toLowerCase().endsWith('.zip')||file.type==='application/zip'||file.type==='application/x-zip-compressed'){
-   const archive=await JSZip.loadAsync(file);
+   const archive=options.prepared?.outer||await JSZip.loadAsync(file);
    if(archive.file('manifest.json'))restored=await readZipArchive(file);
-   else restored=await readLNReaderArchive(file);
+   else{
+    const prepared=options.prepared||await inspectLNReaderArchive(file);
+    if(prepared.quietReader)restored=await readZipArchive(file);
+    else{if(!options.prepared){showLNReaderPreflight(file,prepared);return}restored=await readLNReaderArchive(file,prepared)}
+   }
   }else{
    const parsed=JSON.parse(await file.text());
    try{restored=parseLegacyBackup(parsed)}catch{restored=parseLNReaderJson(parsed)}
