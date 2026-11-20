@@ -1542,3 +1542,21 @@ button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.action
 .lnreader-novel-choice-copy small{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
 .lnreader-novel-choice:hover{background:var(--hover);border-color:var(--hover-border)}
 @media(max-width:650px){#libraryEntryTabs{padding-left:7px;gap:6px}#lnReaderCategoryFilters,#customCategoryFilters{margin-left:5px;padding-left:8px}.lnreader-novel-choices{max-height:34vh}}
+
+
+/* Hierarchical library category manager */
+.category-manager-main{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
+.category-manager-main label{min-width:0}
+.category-manager-main select{width:100%}
+.category-manager-subsection{padding:14px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;gap:12px}
+.category-manager-parent,.category-manager-subcategory{display:flex;align-items:center;gap:9px;min-width:0}
+.category-manager-parent{padding:10px 11px;background:var(--panel2);border:1px solid var(--line);border-radius:9px}
+.category-manager-subcategory{padding:8px 10px 8px 18px}
+.category-manager-subcategory b,.category-manager-parent b{overflow-wrap:anywhere}
+.category-sub-indent{color:var(--muted);flex:0 0 auto}
+.category-manager-lock{min-width:34px;padding:6px 8px;line-height:1}
+.category-manager-lock.locked{border-color:var(--accent)}
+.category-manager button:disabled{opacity:.4;cursor:not-allowed}
+.category-manager .category-create-row{gap:8px}
+.category-manager .category-create-row input{min-width:0;flex:1}
+@media(max-width:520px){.category-manager-main{grid-template-columns:1fr}.category-manager-parent,.category-manager-subcategory{gap:6px}.category-manager-parent button,.category-manager-subcategory button{padding:6px 8px;font-size:11px}}
