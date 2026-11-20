@@ -322,6 +322,7 @@ function manageLibraryCategories(){
  if(!Object.keys(subcategories).length){
   let legacy=[];try{const value=JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]');if(Array.isArray(value))legacy=value.filter(x=>typeof x==='string'&&x.trim())}catch{}
   if(legacy.length)subcategories.manual=legacy.map((name,index)=>({id:'legacy-'+index+'-'+Math.random().toString(36).slice(2,6),name:String(name).trim(),locked:false}));
+  localStorage.setItem('qrLibrarySubcategories',JSON.stringify(subcategories));
  }
  let selectedSource='manual';
  const body='<div class="stack category-manager"><p class="muted tiny">Choose a main library category to manage its subcategories. LN Reader categories are imported from LN Reader and remain fixed here.</p><label>Main category<select id="categoryManagerSelect">'+mainCategories.map(([key,label])=>'<option value="'+key+'">'+label+'</option>').join('')+'</select></label><section class="category-manager-subsection"><div class="row between"><div><b id="categoryManagerHeading">Novels subcategories</b><p class="muted tiny">Locked subcategories cannot be removed. Unlock one to delete it.</p></div><span id="categorySubCount" class="muted tiny"></span></div><div class="row category-create-row"><input id="newSubCategory" placeholder="New subcategory name" maxlength="40"><button type="button" id="addSubCategory" class="primary">Add</button></div><div id="categorySubcategoryList" class="category-manager-list"></div></section></div>';
