@@ -41,8 +41,7 @@ function editTagsModal(){
 function libraryDisplayModal(){
  const defaults=[['all','All entries'],['epub','EPUB'],['manhwa','Manhwa'],['pdf','PDF'],['manual','Novels'],['gallery','Galleries'],['lnreader','LN Reader']];
  let config={};try{config=JSON.parse(localStorage.getItem('qrLibraryEntryConfig')||'{}')||{}}catch{config={}}
- const custom=(()=>{try{return JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]')}catch{return []}})();
- const entries=[...defaults,...custom.map(tag=>['tag:'+tag,tag])];
+ const entries=defaults;
  const rows=entries.map(([key,label])=>{const item=config[key]||{};const locked=item.locked!==false;return '<div class="display-entry-row"><label class="display-entry-visible"><input type="checkbox" data-entry-visible="'+esc(key)+'" '+(item.visible===false?'':'checked')+'><span class="eye-glyph">◉</span></label><input class="display-entry-name" data-entry-label="'+esc(key)+'" value="'+esc(item.label||label)+'" aria-label="Display name for '+esc(label)+'" '+(locked?'disabled':'')+'><button type="button" class="display-entry-lock '+(locked?'locked':'')+'" data-entry-lock="'+esc(key)+'" aria-label="'+(locked?'Unlock':'Lock')+' name">'+(locked?'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7-2"/></svg>')+'</button></div>'}).join('');
  const tags=[...new Set(state.books.flatMap(book=>Array.isArray(book.tags)?book.tags:[]).filter(Boolean))].sort();
  const tagOptions=['<option value="all">All tags</option>',...tags.map(tag=>'<option value="'+esc(tag)+'">'+esc(tag)+'</option>')].join('');
