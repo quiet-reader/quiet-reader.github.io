@@ -64,7 +64,7 @@ jobs:
       - name: Verify this is still the latest branch commit
         id: latest
         run: |
-          REMOTE_SHA=$(git ls-remote origin "$GITHUB_REF" | awk 'NR==1 {print $1}')
+          REMOTE_SHA=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" "$GITHUB_REF" | awk 'NR==1 {print $1}')
           if [ -n "$REMOTE_SHA" ] && [ "$REMOTE_SHA" = "$GITHUB_SHA" ]; then
             echo "is_latest=true" >> "$GITHUB_OUTPUT"
           else
