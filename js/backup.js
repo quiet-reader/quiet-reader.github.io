@@ -435,6 +435,7 @@ async function readLNReaderArchive(file,prepared,onBook){
    const {chapter,index}=ordered[position];
    const decoded=await readDownloadedChapter(downloadZip,pluginId,id,chapter,position);
    if(position&&position%12===0)await new Promise(resolve=>setTimeout(resolve,0));
+   if(position&&position%50===0)toast('LN Reader import · '+String(novel.name||id)+' · '+position+'/'+ordered.length+' chapters');
    let text=decoded.text,images=decoded.images;
    if(!text&&downloadZip){
     const html=chapterHtmlEntry(downloadZip,pluginId,id,chapter);
