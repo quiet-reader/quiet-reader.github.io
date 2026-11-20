@@ -240,6 +240,7 @@ async function checkForAppUpdate(){
   if(registration.waiting){setAppUpdateStatus('Update downloaded · GitHub v'+published.version+' is ready to install.');return}
   if(registration.installing){setAppUpdateStatus('Version verified · GitHub v'+published.version+'. The offline update is already installing.');return}
   if(!registration.active||registration.active.state!=='activated'){setAppUpdateStatus((sameBuild?'Up to date':'Update available')+' · GitHub version verified. The offline app worker is still starting; check again after it becomes active.');return}
+  if(sameBuild){setAppUpdateStatus('Up to date · installed v'+APP_BUILD_VERSION+' matches GitHub v'+published.version+'.');return}
   try{await registration.update()}catch(error){
    const invalidState=error?.name==='InvalidStateError'||/invalid state|uninstalling/i.test(error?.message||'');
    if(!invalidState)console.warn('Quiet Reader service-worker update check:',error);
@@ -269,7 +270,8 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   watch(registration.installing);
   registration.addEventListener('updatefound',()=>{watch(registration.installing);refreshAppUpdateStatus()});
   navigator.serviceWorker.addEventListener('controllerchange',()=>{refreshAppUpdateStatus();if(reloadAfterAppUpdate)location.reload()});
-  if(!registration.installing&&registration.active?.state==='activated')registration.update().catch(error=>{if(error?.name!=='InvalidStateError')console.warn('Quiet Reader startup update check:',error)});
+  // register() already performs the browser's normal update check. Avoid a
+  // second startup update() call racing the explicit Check for updates action.
   refreshAppUpdateStatus();
  }).catch(()=>setAppUpdateStatus('Offline updates are unavailable in this browser context.'));
 }
