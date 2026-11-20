@@ -389,8 +389,8 @@ function parseLNReaderJson(data){
   return book;
  });
  if(!items.length)throw new Error('The LNReader JSON backup contains no novels.');
- const saved=(()=>{try{return JSON.parse(localStorage.getItem('qrLibraryCategories')||'[]')}catch{return []}})();
- localStorage.setItem('qrLibraryCategories',JSON.stringify([...new Set([...saved,...categories.map(category=>String(category.name||'').trim()).filter(Boolean)])]));
+ // Imported LNReader categories are retained as book tags; the custom category
+ // registry is managed separately by the user.
  return {items,theme:null,preferences:null,source:'lnreader-json'};
 }
 async function createGalleryFromZipEntries(file,entries){
