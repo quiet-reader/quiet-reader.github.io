@@ -30,6 +30,15 @@
 <div class="drawer-section import-drawer-section"><h3>IMPORT</h3><button id="restoreBtn">↥　Quiet Reader backup <span>JSON / ZIP</span></button><button id="lnReaderRestoreBtn">↥　LNReader backup <span>ZIP / JSON</span></button><p class="drawer-import-note">2.x ZIPs can include downloaded chapters. Legacy 1.x JSON contains novel details only.</p><button id="archiveRestoreBtn">▣　Books from ZIP <span>EPUB / TXT / PDF</span></button></div>
 <div class="drawer-section"><h3>LIBRARY SETTINGS</h3><button id="libraryDisplayBtn">☷　Library display <span>Entries / sort / view</span></button><button id="manageCategoriesDrawer">＋　Manage categories</button></div>
 <div class="drawer-section"><h3>TOOLS & PREFERENCES</h3><button id="backupBtn">↓　Export backup</button><button id="appearanceBtn">◐　Appearance</button><button id="translationSourcesBtn">文　Translation sources</button><button id="tagColorsBtn">●　Tag colors</button></div>
+<div class="drawer-section app-update-drawer" aria-labelledby="mainAppUpdateHeading">
+<h3 id="mainAppUpdateHeading">APP UPDATES</h3>
+<p class="muted tiny" data-app-update-status aria-live="polite">Checking offline support…</p>
+<div class="row app-update-actions">
+<button type="button" data-app-update-check>Check for updates</button>
+<button type="button" class="primary" data-app-update-install disabled>Install update & reload</button>
+</div>
+<p class="muted tiny">Updates replace cached app files only. Your books, chapters, notes, bookmarks, highlights and reading progress remain stored locally.</p>
+</div>
 <p class="drawer-footnote">Your collection stays in this browser. Keep a backup before clearing site data.</p>
 <input id="restoreFile" type="file" accept=".json,.zip,application/json,application/zip" hidden>
 <input id="lnReaderBackupFile" type="file" accept=".json,.zip,application/json,application/zip" hidden>
