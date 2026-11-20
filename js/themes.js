@@ -37,6 +37,7 @@ export function applyBackground(color,remember=true){
  document.documentElement.style.setProperty('--panel2','color-mix(in srgb, '+value+' 78%, var(--fg))');
  localStorage.setItem('qrBackground',value);
  if(remember)rememberColor('qrBackgroundHistory',value);
+ setFavicon();
 }
 export function applyHoverColor(color,remember=true){
  const value=/^#[0-9a-f]{6}$/i.test(color)?color:null;
