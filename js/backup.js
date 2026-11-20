@@ -187,7 +187,6 @@ async function readZipArchive(file){
 const zipFileCache=new WeakMap();
 const zipPathIndexCache=new WeakMap();
 const chapterFolderCache=new WeakMap();
-const imageFolderCache=new WeakMap();
 function zipFiles(zip){if(!zip||typeof zip!=='object')return [];let files=zipFileCache.get(zip);if(!files){files=Object.values(zip.files||{}).filter(entry=>!entry.dir);zipFileCache.set(zip,files)}return files}
 function zipPathIndex(zip){let index=zipPathIndexCache.get(zip);if(index)return index;const byPath=new Map(),byBase=new Map(),bySegment=new Map(),imagesByFolder=new Map(),htmlFiles=[];for(const entry of zipFiles(zip)){const path=normalizedZipPath(entry.name),parts=pathParts(path);byPath.set(path,entry);const base=parts.at(-1);if(!byBase.has(base))byBase.set(base,[]);byBase.get(base).push(entry);if(/\.html?$/i.test(base))htmlFiles.push(entry);for(const part of new Set(parts)){if(!bySegment.has(part))bySegment.set(part,[]);bySegment.get(part).push(entry)}if(/\.(png|jpe?g|webp|gif|avif|bmp)$/i.test(base)){for(let i=1;i<parts.length;i++){const folder=parts.slice(0,i).join('/');if(!imagesByFolder.has(folder))imagesByFolder.set(folder,[]);imagesByFolder.get(folder).push(entry)}}}for(const images of imagesByFolder.values())images.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));index={byPath,byBase,bySegment,imagesByFolder,htmlFiles};zipPathIndexCache.set(zip,index);return index}
 function findZipEntry(zip,predicate){return zipFiles(zip).find(entry=>predicate(entry.name.split(String.fromCharCode(92)).join('/')))}
@@ -344,7 +343,7 @@ async function inspectLNReaderSources(source){
  if(folderInputs.length)archives.push({archive:makeFolderArchive(folderInputs),label:'Extracted folder',folder:true});
  for(const file of zipInputs)archives.push({archive:await JSZip.loadAsync(file),label:file.name||'ZIP',file});
  if(!archives.length)throw new Error('Choose one or more ZIP files or an extracted LN Reader folder.');
- let dataZip=null,downloadZip=null;const metadataFiles=[];
+ let dataZip=null,downloadZip=null;
  for(const item of archives){
   const archive=item.archive;const entries=zipFiles(archive);
   if(item.label.toLowerCase()==='data.zip'&&archiveHasNovelMetadata(archive))dataZip=dataZip||archive;
@@ -352,7 +351,6 @@ async function inspectLNReaderSources(source){
   if(item.label.toLowerCase()==='novel-files.zip'){if(!dataZip)dataZip=archive;downloadZip=downloadZip||archive}
   for(const entry of entries){
    const base=pathParts(entry.name).at(-1)||'';
-   if(/\.json$/i.test(base)&&/(app|preference|setting|plugin|version|config|category|metadata)/i.test(base))metadataFiles.push(entry.name);
    if(base.toLowerCase()==='data.zip'&&!dataZip)dataZip=await JSZip.loadAsync(await entry.async('uint8array'));
    if(base.toLowerCase()==='download.zip'&&!downloadZip)downloadZip=await JSZip.loadAsync(await entry.async('uint8array'));
    if(base.toLowerCase()==='novel-files.zip'){const nested=await JSZip.loadAsync(await entry.async('uint8array'));if(!dataZip)dataZip=nested;downloadZip=downloadZip||nested}
@@ -403,7 +401,7 @@ function showLNReaderPreflight(file,report,source=file){
  const html='<div class="stack"><p class="muted tiny">Preflight inspection only. Nothing has been added to your library yet.</p><div class="modal-item"><b>Archive</b><p>'+esc(report.sourceLabel||file.name||'LN Reader backup')+' · '+readableSize(report.size)+' compressed · approx. '+readableSize(report.expandedSize)+' expanded</p><p>'+report.outerCount+' files · '+report.folderCount+' folders · '+report.dataCount+' data entries · '+report.downloadCount+' downloaded entries</p></div><div class="modal-item"><b>Detected content</b><p>'+report.novelRecords.length+' novels · '+report.chapters+' chapter records · '+report.categories.length+' categories</p><p>'+(categoryNames.length?categoryNames.map(esc).join(', '):'No categories found')+'</p></div><div class="modal-item"><b>Settings and app metadata</b><ul class="tiny">'+settings+'</ul></div><div class="modal-item"><b>Verification notes</b>'+missing+'</div>'+memoryNote+'<p class="muted tiny">This inspection checks archive structure, metadata JSON and chapter indexes. Individual chapter payloads and image bytes are decoded during import. Completed novels are saved as they finish, so an interrupted import may leave those completed novels in your library.</p><div class="row"><span class="grow"></span><button type="button" id="cancelLNReaderPreflight">Cancel</button><button type="button" class="primary" id="confirmLNReaderPreflight" '+(!report.novelRecords.length?'disabled':'')+'>Import detected content</button></div></div>';
  modal('Review LN Reader backup',html,()=>{$('cancelLNReaderPreflight').onclick=closeModal;$('confirmLNReaderPreflight').onclick=()=>{closeModal();void importBackup(source,{prepared:report})}});
 }
-async function readLNReaderArchive(file,prepared,onBook){
+async function readLNReaderArchive(prepared,onBook){
  const dataZip=prepared?.dataZip;
  if(!dataZip)throw new Error('This is not a recognised LN Reader archive or extracted backup folder.');
  const novelEntries=prepared?.novelEntries||[];
@@ -438,7 +436,7 @@ async function readLNReaderArchive(file,prepared,onBook){
   });
   let lastReadIndex=-1,lastReadAt=0;book.readingHistory=[];
   for(let position=0;position<ordered.length;position++){
-   const {chapter,index}=ordered[position];
+   const {chapter}=ordered[position];
    const decoded=await readDownloadedChapter(downloadZip,pluginId,id,chapter,position);
    if(position&&position%12===0)await new Promise(resolve=>setTimeout(resolve,0));
    if(position&&position%50===0)toast('LN Reader import · '+String(novel.name||id)+' · '+position+'/'+ordered.length+' chapters');
@@ -582,7 +580,7 @@ export async function importBackup(file,options={}){
    }else{
     const prepared=options.prepared||await inspectLNReaderSources(sources);
     if(!options.prepared){showLNReaderPreflight(first,prepared,sources);return}
-    restored=await readLNReaderArchive(sources,prepared,put);
+    restored=await readLNReaderArchive(prepared,put);
    }
   }else if(options.jsonPrepared){restored=options.jsonPrepared}
   else{
