@@ -333,6 +333,7 @@ function fallbackNovelRecords(archive){
   const group=groups.get(novelId);
   if(!group.chapters.has(chapterId))group.chapters.set(chapterId,{id:chapterId,chapterNumber:chapterId,name:'Chapter '+chapterId,path:chapterPath});
  }
+ if(!groups.size){for(const entry of zipFiles(archive)){const parts=pathParts(entry.name),base=parts.at(-1)||'';let plugin='local',novelId='',chapterId='',chapterPath='';if(/index\.html?$/i.test(base)&&parts.length>=3){chapterId=parts.at(-2);novelId=parts.at(-3);plugin=parts.length>=4?parts.at(-4):'local';chapterPath=chapterId}else if(/^(?:chapter[-_ ]*)?\d+\.json$/i.test(base)&&parts.length>=3){chapterId=base.replace(/\.json$/i,'');novelId=parts.at(-2);plugin=parts.length>=3?parts.at(-3):'local';chapterPath=chapterId}else continue;if(!groups.has(novelId))groups.set(novelId,{id:novelId,pluginId:plugin,name:'LN Reader novel '+novelId,chapters:new Map()});const group=groups.get(novelId);if(!group.chapters.has(chapterId))group.chapters.set(chapterId,{id:chapterId,chapterNumber:chapterId,name:'Chapter '+chapterId,path:chapterPath})}}
  return [...groups.values()].map(group=>({entry:{name:'fallback/'+group.pluginId+'/NovelAndChapters/'+group.id+'.json'},novel:{id:group.id,pluginId:group.pluginId,name:group.name,chapters:[...group.chapters.values()].sort((a,b)=>String(a.chapterNumber).localeCompare(String(b.chapterNumber),undefined,{numeric:true}))}})).filter(record=>record.novel.chapters.length);
 }
 async function inspectLNReaderSources(source){
@@ -370,7 +371,8 @@ async function inspectLNReaderSources(source){
  const chapters=novelRecords.reduce((sum,record)=>sum+record.novel.chapters.length,0),missing=[];
  if(fallback)missing.push('Novel detail JSON is missing; titles and chapter order will be reconstructed from folder names and chapter indexes');
  if(!categoryEntry)missing.push('category.json (LN Reader category subcategories will not be created)');
- if(downloadZip===dataZip)missing.push('A separate download archive was not detected; chapter text and images may be incomplete');
+ const payloadCount=zipFiles(downloadZip).filter(entry=>/\.(html?|png|jpe?g|webp|gif|avif|bmp)$/i.test(entry.name)||(/\.json$/i.test(entry.name)&&!normalizedZipPath(entry.name).includes('novelandchapters/')&&!/category\.json$/i.test(entry.name))).length;
+ if(!payloadCount)missing.push('No downloaded chapter HTML, JSON, or image payloads were detected; chapter text may be unavailable');
  const size=sources.reduce((sum,file)=>sum+(Number(file.size)||0),0),expandedSize=archives.reduce((sum,item)=>sum+estimateExpandedSize(item.archive),0)+estimateExpandedSize(dataZip)+(downloadZip!==dataZip?estimateExpandedSize(downloadZip):0);
  return {outer,dataZip,downloadZip,novelEntries,novelRecords,categories,categoryEntry,settingsFiles:[...new Set([...metadataFiles,...dataFiles.filter(entry=>/\.json$/i.test(entry.name)&&/(settings|plugin|version|config|category)/i.test(entry.name)).map(entry=>entry.name)])],chapters,outerCount:archives.reduce((sum,item)=>sum+zipFiles(item.archive).length,0),folderCount:archives.reduce((sum,item)=>sum+countArchiveFolders(item.archive),0)+countArchiveFolders(dataZip)+(downloadZip!==dataZip?countArchiveFolders(downloadZip):0),dataCount:dataFiles.length,downloadCount:zipFiles(downloadZip).length,missing,size,expandedSize,fallback,sourceLabel:sources.length===1?(folderInputs.length?'Extracted folder':sources[0].name||'LN Reader backup'):sources.length+' selected files'};
 }
