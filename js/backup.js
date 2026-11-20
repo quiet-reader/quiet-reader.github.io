@@ -233,7 +233,7 @@ async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId,htmlPath=''
 }
 function chapterHtmlEntry(zip,pluginId,novelId,chapter){
  const id=String(chapter.id??''),plugin=String(pluginId||'local'),novel=String(novelId||'');
- const all=(zipPathIndex(zip).bySegment.get(id.toLowerCase())||[]).filter(entry=>/\/index\.html?$/i.test('/'+entry.name.replace(/\\/g,'/')));
+ const all=(zipPathIndex(zip).bySegment.get(id.toLowerCase())||[]).filter(entry=>/\.html?$/i.test(entry.name));
  const exact=all.find(entry=>{const path='/'+entry.name.replace(/\\/g,'/');return path.endsWith('/'+plugin+'/'+novel+'/'+id+'/index.html')||path.endsWith('/'+novel+'/'+id+'/index.html')});
  if(exact)return exact;
  const byId=all.filter(entry=>('/'+entry.name.replace(/\\/g,'/')+'/').toLowerCase().includes('/'+id.toLowerCase()+'/'));
