@@ -158,7 +158,7 @@ selectionBar.addEventListener('click',e=>{
  }
  if(e.target.closest('[data-highlight-bookmark]'))bookmarkFromSelection()
 });document.addEventListener('pointerdown',e=>{if(!e.target.closest('#selectionToolbar')&&!e.target.closest('#readingBody'))hideSelectionToolbar()});let progressTimer;window.addEventListener('scroll',()=>{if(state.screen==='reader'){clearTimeout(progressTimer);progressTimer=setTimeout(saveProgress,450)}});
-await refresh();enhanceSelects();initTheme();initTTS();setTTSEngine();renderInstalledAppVersion();const APP_BUILD_VERSION=import.meta.env?.VITE_APP_VERSION||'dev';
+await refresh();enhanceSelects();initTheme();initTTS();setTTSEngine();const APP_BUILD_VERSION=import.meta.env?.VITE_APP_VERSION||'dev';
 const APP_BUILD_COMMIT=import.meta.env?.VITE_APP_COMMIT||'development';
 const APP_BUILD_SHELL=import.meta.env?.VITE_APP_SHELL||'unknown';
 let appUpdateRegistration=null;
@@ -170,6 +170,7 @@ const publishedVersionNodes=()=>[...document.querySelectorAll('[data-published-v
 function setAppUpdateStatus(message){updateStatusNodes().forEach(node=>{node.textContent=message})}
 function renderInstalledAppVersion(){const shell=String(APP_BUILD_SHELL).replace(/^quiet-reader-shell-v/,'');const message='Installed app · v'+APP_BUILD_VERSION+' · commit '+APP_BUILD_COMMIT+' · offline shell '+shell;appVersionNodes().forEach(node=>{node.textContent=message})}
 function renderPublishedAppVersion(version){const message='Latest GitHub build · v'+version.version+' · commit '+version.commit+' · offline shell '+String(version.shell||'unknown').replace(/^quiet-reader-shell-v/,'');publishedVersionNodes().forEach(node=>{node.textContent=message})}
+renderInstalledAppVersion();
 function refreshAppUpdateStatus(){
  const installs=updateInstallNodes();
  if(!navigator.onLine){setAppUpdateStatus('Offline. The installed version shown above remains available.');installs.forEach(button=>button.disabled=!appUpdateRegistration?.waiting);return}
