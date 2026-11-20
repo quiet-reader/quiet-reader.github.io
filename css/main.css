@@ -1459,3 +1459,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .actions .card-open-action:hover,.actions button.primary:hover,.library-actions button.primary:hover{background:var(--accent)!important;border-color:var(--accent)!important;color:#202020!important}
 .actions button:hover,.library-actions button:hover,.custom-category-filters button.active{border-color:var(--accent)!important;color:var(--accent)!important}
 .custom-category-filters button.active{background:color-mix(in srgb,var(--accent) 12%,var(--panel))!important}
+
+/* Custom text color follows through on legacy hard-coded foreground styles */
+html.has-custom-text-color body :is(h1,h2,h4,p,label,small,li,.book-title,.book-subtitle,.detail-author,.chapter-name,.reading-body,.reader-book-title,.chapter-kicker,.chapter-character-count,.card-updated,.drawer-footnote,.drawer-head,.reader-settings-group,.reading-history-entry,.saved-mark-item,.empty,.empty-state h2,.empty-state p,.section-heading h2,.book-detail h1,.book-detail p,.novel-search-result,.novel-search-result span,.collection-card-open b,.collection-entry-copy){color:var(--fg)!important}
+html.has-custom-text-color body .reader-panel h3,html.has-custom-text-color body .appearance-history-heading{color:var(--accent)!important}
+button.primary:hover,.primary-button:hover,.actions .card-open-action:hover{background:var(--accent)!important;border-color:var(--accent)!important;color:#202020!important}
