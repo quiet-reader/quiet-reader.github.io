@@ -151,56 +151,49 @@ selectionBar.addEventListener('click',e=>{
 });document.addEventListener('pointerdown',e=>{if(!e.target.closest('#selectionToolbar')&&!e.target.closest('#readingBody'))hideSelectionToolbar()});let progressTimer;window.addEventListener('scroll',()=>{if(state.screen==='reader'){clearTimeout(progressTimer);progressTimer=setTimeout(saveProgress,450)}});
 await refresh();enhanceSelects();initTheme();initTTS();setTTSEngine();let appUpdateRegistration=null;
 let reloadAfterAppUpdate=false;
+const updateStatusNodes=()=>[...document.querySelectorAll('#appUpdateStatus,[data-app-update-status]')];
+const updateInstallNodes=()=>[...document.querySelectorAll('#installAppUpdate,[data-app-update-install]')];
+function setAppUpdateStatus(message){updateStatusNodes().forEach(node=>{node.textContent=message})}
 function refreshAppUpdateStatus(){
- const status=document.getElementById('appUpdateStatus');
- const install=document.getElementById('installAppUpdate');
- if(!status||!install)return;
- if(!navigator.onLine){status.textContent='Offline. The currently cached app remains available.';install.disabled=!appUpdateRegistration?.waiting;return}
- if(appUpdateRegistration?.waiting){status.textContent='A newer app version is downloaded and ready to install.';install.disabled=false;return}
- if(appUpdateRegistration?.installing){status.textContent='Downloading and preparing the app update…';install.disabled=true;return}
- status.textContent=navigator.serviceWorker?.controller?'Offline app shell is ready. No update is waiting.':'Preparing the first offline app cache…';
- install.disabled=true;
+ const installs=updateInstallNodes();
+ if(!navigator.onLine){setAppUpdateStatus('Offline. The currently cached app remains available.');installs.forEach(button=>button.disabled=!appUpdateRegistration?.waiting);return}
+ if(appUpdateRegistration?.waiting){setAppUpdateStatus('A newer app version is downloaded and ready to install.');installs.forEach(button=>button.disabled=false);return}
+ if(appUpdateRegistration?.installing){setAppUpdateStatus('Downloading and preparing the app update…');installs.forEach(button=>button.disabled=true);return}
+ setAppUpdateStatus(navigator.serviceWorker?.controller?'Offline app shell is ready. No update is waiting.':'Preparing the first offline app cache…');
+ installs.forEach(button=>button.disabled=true);
 }
-if('serviceWorker' in navigator&&location.protocol!=='file:'){
- navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).then(registration=>{
-  appUpdateRegistration=registration;
-  const watch=worker=>{
-   if(!worker)return;
-   worker.addEventListener('statechange',refreshAppUpdateStatus);
-  };
-  watch(registration.installing);
-  registration.addEventListener('updatefound',()=>{watch(registration.installing);refreshAppUpdateStatus()});
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{
-   refreshAppUpdateStatus();
-   if(reloadAfterAppUpdate)location.reload();
-  });
-  registration.update().catch(()=>{});
-  refreshAppUpdateStatus();
- }).catch(()=>{
-  const status=document.getElementById('appUpdateStatus');
-  if(status)status.textContent='Offline updates are unavailable in this browser context.';
- });
-}
-document.getElementById('checkAppUpdate')?.addEventListener('click',async()=>{
- const status=document.getElementById('appUpdateStatus');
- if(!appUpdateRegistration){if(status)status.textContent='Service worker is not ready yet.';return}
- if(!navigator.onLine){if(status)status.textContent='Connect to the internet to check for updates.';return}
- if(status)status.textContent='Checking the published website for an update…';
+async function checkForAppUpdate(){
+ if(!appUpdateRegistration){setAppUpdateStatus('Service worker is not ready yet.');return}
+ if(!navigator.onLine){setAppUpdateStatus('Connect to the internet to check for updates.');return}
+ setAppUpdateStatus('Checking the published website for an update…');
  try{
   await appUpdateRegistration.update();
   refreshAppUpdateStatus();
-  if(!appUpdateRegistration.waiting&&!appUpdateRegistration.installing&&status)status.textContent='You already have the latest published app version.';
- }catch{if(status)status.textContent='Could not check for updates. Your current app and local data are unchanged.'}
-});
-document.getElementById('installAppUpdate')?.addEventListener('click',()=>{
+  if(!appUpdateRegistration.waiting&&!appUpdateRegistration.installing)setAppUpdateStatus('You already have the latest published app version.');
+ }catch{setAppUpdateStatus('Could not check for updates. Your current app and local data are unchanged.')}
+}
+function installAppUpdate(){
  if(!appUpdateRegistration?.waiting)return;
  reloadAfterAppUpdate=true;
- const status=document.getElementById('appUpdateStatus');
- if(status)status.textContent='Installing the update. The app will reload when the new version takes control.';
+ setAppUpdateStatus('Installing the update. The app will reload when the new version takes control.');
  appUpdateRegistration.waiting.postMessage({type:'SKIP_WAITING'});
-});
+}
+document.querySelectorAll('#checkAppUpdate,[data-app-update-check]').forEach(button=>button.addEventListener('click',checkForAppUpdate));
+document.querySelectorAll('#installAppUpdate,[data-app-update-install]').forEach(button=>button.addEventListener('click',installAppUpdate));
+if('serviceWorker' in navigator&&location.protocol!=='file:'){
+ navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).then(registration=>{
+  appUpdateRegistration=registration;
+  const watch=worker=>{if(worker)worker.addEventListener('statechange',refreshAppUpdateStatus)};
+  watch(registration.installing);
+  registration.addEventListener('updatefound',()=>{watch(registration.installing);refreshAppUpdateStatus()});
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{refreshAppUpdateStatus();if(reloadAfterAppUpdate)location.reload()});
+  registration.update().catch(()=>{});
+  refreshAppUpdateStatus();
+ }).catch(()=>setAppUpdateStatus('Offline updates are unavailable in this browser context.'));
+}
 window.addEventListener('online',refreshAppUpdateStatus);
-window.addEventListener('offline',refreshAppUpdateStatus);setScreen('library');
+window.addEventListener('offline',refreshAppUpdateStatus);
+setScreen('library');
 
 // Top-level Library / Galleries navigation and user-defined library categories.
 function syncHeaderActions(section){
