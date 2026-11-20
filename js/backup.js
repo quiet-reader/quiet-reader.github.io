@@ -184,8 +184,14 @@ async function readZipArchive(file){
  return {items:restored,theme:library.theme,preferences:library.preferences};
 }
 
-function zipFiles(zip){return Object.values(zip.files||{}).filter(entry=>!entry.dir)}
+const zipFileCache=new WeakMap();
+const zipPathIndexCache=new WeakMap();
+const chapterFolderCache=new WeakMap();
+const imageFolderCache=new WeakMap();
+function zipFiles(zip){if(!zip||typeof zip!=='object')return [];let files=zipFileCache.get(zip);if(!files){files=Object.values(zip.files||{}).filter(entry=>!entry.dir);zipFileCache.set(zip,files)}return files}
+function zipPathIndex(zip){let index=zipPathIndexCache.get(zip);if(index)return index;const byPath=new Map(),byBase=new Map();for(const entry of zipFiles(zip)){const path=normalizedZipPath(entry.name);byPath.set(path,entry);const base=pathParts(path).at(-1);if(!byBase.has(base))byBase.set(base,[]);byBase.get(base).push(entry)}index={byPath,byBase};zipPathIndexCache.set(zip,index);return index}
 function findZipEntry(zip,predicate){return zipFiles(zip).find(entry=>predicate(entry.name.split(String.fromCharCode(92)).join('/')))}
+function zipImagesInFolder(zip,folder){let cache=imageFolderCache.get(zip);if(!cache){cache=new Map();imageFolderCache.set(zip,cache)}if(cache.has(folder))return cache.get(folder);const prefix=folder?folder+'/':'';const images=zipFiles(zip).filter(entry=>{const name=normalizedZipPath(entry.name);return name.startsWith(prefix)&&name.slice(prefix.length).indexOf('/')<0&&/\\.(png|jpe?g|webp|gif|avif|bmp)$/i.test(name)}).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));cache.set(folder,images);return images}
 function guessMime(name){
  const ext=String(name).split('.').pop().toLowerCase();
  return ({jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',avif:'image/avif',svg:'image/svg+xml',bmp:'image/bmp',epub:'application/epub+zip',pdf:'application/pdf',txt:'text/plain'})[ext]||'application/octet-stream';
@@ -201,12 +207,10 @@ async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId,htmlPath=''
   let decoded='';try{decoded=decodeURIComponent(src.split(/[?#]/,1)[0])}catch{decoded=src.split(/[?#]/,1)[0]}
   const filename=decoded.split('/').pop()||'';
   if(!filename)continue;
-  const candidates=[base+'/'+decoded.replace(/^\.\//,''),base+'/'+filename];
-  const entry=findZipEntry(zip,name=>{
-   const normalized=name.replace(/^\.\//,'');
-   return candidates.some(path=>normalized===path||normalized.endsWith('/'+path))||
-    (normalized.endsWith('/'+filename)&&normalized.toLowerCase().includes('/'+String(chapterId).toLowerCase()+'/'));
-  });
+  const candidates=[base+'/'+decoded.replace(/^\.\//,''),base+'/'+filename].map(normalizedZipPath);
+  const index=zipPathIndex(zip);
+  const entry=candidates.map(path=>index.byPath.get(path)).find(Boolean)||
+   (index.byBase.get(normalizedZipPath(filename))||[]).find(item=>normalizedZipPath(item.name).includes('/'+String(chapterId).toLowerCase()+'/'));
   if(entry&&/^image\//i.test(guessMime(filename))){
    const bytes=await entry.async('uint8array'),mime=guessMime(filename),id=safeId();
    images.push({id,data:'data:'+mime+';base64,'+bytesToBase64(bytes),mime,name:filename});
@@ -250,15 +254,11 @@ function chapterPayloadText(payload){
  return '';
 }
 function chapterFolderFiles(zip,pluginId,novelId,chapter,index){
- const files=zipFiles(zip),plugin=String(pluginId||'').toLowerCase(),novel=String(novelId||'').toLowerCase();
+ const plugin=String(pluginId||'').toLowerCase(),novel=String(novelId||'').toLowerCase();
+ let cache=chapterFolderCache.get(zip);if(!cache){cache=new Map();chapterFolderCache.set(zip,cache)}
+ const key=plugin+'|'+novel;let matching=cache.get(key);
+ if(!matching){matching=zipFiles(zip).filter(entry=>{const parts=pathParts(entry.name);const novelAt=parts.findIndex(part=>part===novel);if(novelAt<0)return false;if(plugin&&novelAt>0&&!parts.slice(0,novelAt).includes(plugin))return false;return true});cache.set(key,matching)}
  const id=String(chapter.id??'').toLowerCase(),number=String(chapter.chapterNumber??index+1).toLowerCase();
- const matching=files.filter(entry=>{
-  const parts=pathParts(entry.name);
-  const novelAt=parts.findIndex(part=>part===novel);
-  if(novelAt<0)return false;
-  if(plugin&&novelAt>0&&!parts.slice(0,novelAt).includes(plugin))return false;
-  return true;
- });
  const exact=matching.filter(entry=>{
   const parts=pathParts(entry.name),base=parts.at(-1)||'';
   return base===id+'.json'||base===number+'.json'||parts.some(part=>part===id||part===number);
@@ -290,10 +290,7 @@ async function readDownloadedChapter(downloadZip,pluginId,novelId,chapter,index)
  let text=raw;
  if(!text&&Array.isArray(payload?.content))text=payload.content.map(jsonString).join('\n');
  const folder=pathParts(jsonEntry.name).slice(0,-1).join('/');
- const imageEntries=zipFiles(downloadZip).filter(entry=>{
-  const name=normalizedZipPath(entry.name);
-  return name.startsWith(folder+'/')&&/\.(png|jpe?g|webp|gif|avif|bmp)$/i.test(name);
- }).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
+ const imageEntries=zipImagesInFolder(downloadZip,folder);
  const images=[];
  for(const entry of imageEntries){
   const bytes=await entry.async('uint8array'),mime=guessMime(entry.name),id=safeId();
