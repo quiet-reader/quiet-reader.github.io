@@ -364,8 +364,9 @@ async function inspectLNReaderSources(source){
  const dataFiles=zipFiles(dataZip),novelEntries=dataFiles.filter(entry=>normalizedZipPath(entry.name).includes('novelandchapters/')&&/\.json$/i.test(entry.name)),novelRecords=[];
  for(const entry of novelEntries){try{const novel=JSON.parse(await entry.async('string'));if(novel&&typeof novel==='object'&&Array.isArray(novel.chapters))novelRecords.push({entry,novel})}catch{}}
  if(!novelRecords.length){for(const entry of dataFiles.filter(entry=>/\.json$/i.test(entry.name)&&/(novels?|novel-files)/i.test(entry.name))){try{const novel=JSON.parse(await entry.async('string'));if(novel&&typeof novel==='object'&&Array.isArray(novel.chapters))novelRecords.push({entry,novel})}catch{}}}
+ if(!novelRecords.length){for(const entry of dataFiles.filter(entry=>/\.json$/i.test(entry.name))){try{const value=JSON.parse(await entry.async('string')),list=[value?.novels,value?.library?.novels,value?.data?.novels,value?.backup?.novels].find(Array.isArray);if(list)for(const novel of list)if(novel&&typeof novel==='object'&&Array.isArray(novel.chapters))novelRecords.push({entry,novel})}catch{}}}
  let fallback=false;if(!novelRecords.length){const generated=fallbackNovelRecords(downloadZip);if(generated.length){novelRecords.push(...generated);fallback=true}}
- const categoryEntry=findZipEntry(dataZip,name=>pathParts(name).at(-1)==='category.json');let categories=[];
+ const categoryEntry=findZipEntry(dataZip,name=>pathParts(name).at(-1)==='category.json')||archives.map(item=>findZipEntry(item.archive,name=>pathParts(name).at(-1)==='category.json')).find(Boolean);let categories=[];
  if(categoryEntry){try{const parsed=JSON.parse(await categoryEntry.async('string'));categories=Array.isArray(parsed)?parsed:[]}catch{}}
  const chapters=novelRecords.reduce((sum,record)=>sum+record.novel.chapters.length,0),missing=[];
  if(!novelRecords.length)missing.push('No novel detail JSON or recognizable numbered chapter folders were found; no novels can be safely created');
