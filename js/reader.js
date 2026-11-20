@@ -416,7 +416,8 @@ export async function startAutoRead(){
  updateAutoReadControls();
  scheduleAutoRead();
 }
-export function isAutoReadSpeaking(){if(!autoReadRunning||autoReadPaused||!$('ttsEnabled')?.checked||!currentUtterance)return false;return currentUtterance.kokoro?Boolean(currentUtterance.playing):Boolean(ttsSupported()&&window.speechSynthesis.speaking)}
+export function isAutoReadActive(){return Boolean(autoReadRunning&&!autoReadPaused)}
+export function isAutoReadSpeaking(){if(!isAutoReadActive()||!$('ttsEnabled')?.checked||!currentUtterance)return false;return currentUtterance.kokoro?Boolean(currentUtterance.playing):Boolean(ttsSupported()&&window.speechSynthesis.speaking)}
 export function pauseAutoRead(){
  if(!autoReadRunning)return;
  autoReadPaused=true;
