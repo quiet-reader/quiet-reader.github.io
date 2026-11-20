@@ -1374,3 +1374,5 @@ body.detail-header-hidden .book-detail{display:none!important}
 .app-update-actions button{font:inherit}
 .app-update-actions button:disabled{opacity:.45;cursor:not-allowed}
 .app-update-group>p{line-height:1.5}
+
+.ln-reader-category-filters{display:flex;gap:7px;flex-wrap:wrap;width:100%;padding:0 0 4px 10px;margin-top:-8px;border-left:2px solid var(--accent)}.ln-reader-category-filters button{font-size:12px;padding:5px 10px;background:transparent;border-color:var(--line)}.ln-reader-category-filters button.active{background:var(--fg);color:#292929}
