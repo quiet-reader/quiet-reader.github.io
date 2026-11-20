@@ -322,7 +322,8 @@ function fallbackNovelRecords(archive){
   const parts=pathParts(entry.name),novelsAt=parts.indexOf('novels');
   if(novelsAt<0||!parts[novelsAt+1])continue;
   let plugin=parts[novelsAt-1]||'local',novelId=parts[novelsAt+1],rest=parts.slice(novelsAt+2);
-  if(plugin==='plugins'&&rest.length>=2){plugin=rest[0];novelId=rest[1];rest=rest.slice(2)}
+  if(plugin==='plugins'&&rest.length>=3&&!['chapters','downloads'].includes(rest[0])){plugin=rest[0];novelId=rest[1];rest=rest.slice(2)}else if(plugin==='plugins')plugin='local';
+  if(rest[0]==='chapters'||rest[0]==='downloads')rest=rest.slice(1);
   if(!rest.length)continue;
   let chapterId='',chapterPath='';
   if(/index\.html?$/i.test(entry.name)||/\.(html?|json)$/i.test(entry.name)){chapterId=rest.length>1?rest[0]:String(rest[0]||'').replace(/\.(html?|json)$/i,'');chapterPath=rest.slice(0,Math.max(1,rest.length-1)).join('/')}
