@@ -189,9 +189,9 @@ const zipPathIndexCache=new WeakMap();
 const chapterFolderCache=new WeakMap();
 const imageFolderCache=new WeakMap();
 function zipFiles(zip){if(!zip||typeof zip!=='object')return [];let files=zipFileCache.get(zip);if(!files){files=Object.values(zip.files||{}).filter(entry=>!entry.dir);zipFileCache.set(zip,files)}return files}
-function zipPathIndex(zip){let index=zipPathIndexCache.get(zip);if(index)return index;const byPath=new Map(),byBase=new Map();for(const entry of zipFiles(zip)){const path=normalizedZipPath(entry.name);byPath.set(path,entry);const base=pathParts(path).at(-1);if(!byBase.has(base))byBase.set(base,[]);byBase.get(base).push(entry)}index={byPath,byBase};zipPathIndexCache.set(zip,index);return index}
+function zipPathIndex(zip){let index=zipPathIndexCache.get(zip);if(index)return index;const byPath=new Map(),byBase=new Map(),bySegment=new Map(),imagesByFolder=new Map(),htmlFiles=[];for(const entry of zipFiles(zip)){const path=normalizedZipPath(entry.name),parts=pathParts(path);byPath.set(path,entry);const base=parts.at(-1);if(!byBase.has(base))byBase.set(base,[]);byBase.get(base).push(entry);if(/\.html?$/i.test(base))htmlFiles.push(entry);for(const part of new Set(parts)){if(!bySegment.has(part))bySegment.set(part,[]);bySegment.get(part).push(entry)}if(/\.(png|jpe?g|webp|gif|avif|bmp)$/i.test(base)){for(let i=1;i<parts.length;i++){const folder=parts.slice(0,i).join('/');if(!imagesByFolder.has(folder))imagesByFolder.set(folder,[]);imagesByFolder.get(folder).push(entry)}}}index={byPath,byBase,bySegment,imagesByFolder,htmlFiles};zipPathIndexCache.set(zip,index);return index}
 function findZipEntry(zip,predicate){return zipFiles(zip).find(entry=>predicate(entry.name.split(String.fromCharCode(92)).join('/')))}
-function zipImagesInFolder(zip,folder){let cache=imageFolderCache.get(zip);if(!cache){cache=new Map();imageFolderCache.set(zip,cache)}if(cache.has(folder))return cache.get(folder);const prefix=folder?folder+'/':'';const images=zipFiles(zip).filter(entry=>{const name=normalizedZipPath(entry.name);return name.startsWith(prefix)&&/\.(png|jpe?g|webp|gif|avif|bmp)$/i.test(name)}).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));cache.set(folder,images);return images}
+function zipImagesInFolder(zip,folder){const key=normalizedZipPath(folder);return zipPathIndex(zip).imagesByFolder.get(key)||[]}
 function guessMime(name){
  const ext=String(name).split('.').pop().toLowerCase();
  return ({jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',avif:'image/avif',svg:'image/svg+xml',bmp:'image/bmp',epub:'application/epub+zip',pdf:'application/pdf',txt:'text/plain'})[ext]||'application/octet-stream';
@@ -233,7 +233,7 @@ async function decodeHtmlChapter(html,zip,pluginId,novelId,chapterId,htmlPath=''
 }
 function chapterHtmlEntry(zip,pluginId,novelId,chapter){
  const id=String(chapter.id??''),plugin=String(pluginId||'local'),novel=String(novelId||'');
- const all=zipFiles(zip).filter(entry=>/\/index\.html?$/i.test('/'+entry.name.replace(/\\/g,'/')));
+ const all=zipPathIndex(zip).htmlFiles.filter(entry=>/\/index\.html?$/i.test('/'+entry.name.replace(/\\/g,'/')));
  const exact=all.find(entry=>{const path='/'+entry.name.replace(/\\/g,'/');return path.endsWith('/'+plugin+'/'+novel+'/'+id+'/index.html')||path.endsWith('/'+novel+'/'+id+'/index.html')});
  if(exact)return exact;
  const byId=all.filter(entry=>('/'+entry.name.replace(/\\/g,'/')+'/').toLowerCase().includes('/'+id.toLowerCase()+'/'));
@@ -257,7 +257,7 @@ function chapterFolderFiles(zip,pluginId,novelId,chapter,index){
  const plugin=String(pluginId||'').toLowerCase(),novel=String(novelId||'').toLowerCase();
  let cache=chapterFolderCache.get(zip);if(!cache){cache=new Map();chapterFolderCache.set(zip,cache)}
  const key=plugin+'|'+novel;let matching=cache.get(key);
- if(!matching){matching=zipFiles(zip).filter(entry=>{const parts=pathParts(entry.name);const novelAt=parts.findIndex(part=>part===novel);if(novelAt<0)return false;if(plugin&&novelAt>0&&!parts.slice(0,novelAt).includes(plugin))return false;return true});cache.set(key,matching)}
+ if(!matching){matching=(zipPathIndex(zip).bySegment.get(novel)||[]).filter(entry=>{const parts=pathParts(entry.name),novelAt=parts.findIndex(part=>part===novel);if(novelAt<0)return false;if(plugin&&novelAt>0&&!parts.slice(0,novelAt).includes(plugin))return false;return true});cache.set(key,matching)}
  const id=String(chapter.id??'').toLowerCase(),number=String(chapter.chapterNumber??index+1).toLowerCase();
  const exact=matching.filter(entry=>{
   const parts=pathParts(entry.name),base=parts.at(-1)||'';
@@ -399,7 +399,7 @@ async function readLNReaderArchive(file,prepared){
   book.author=String(novel.author||'');book.summary=String(novel.summary||'');
   book.tags=[...new Set(tags)];
   book.lnReader={pluginId,originalId:id,path:String(novel.path||''),status:novel.status||'',artist:novel.artist||'',categories:novelCategories,source:'LNReader'};
-  const novelDownloadFiles=downloadZip?zipFiles(downloadZip).filter(item=>{
+  const novelDownloadFiles=downloadZip?(zipPathIndex(downloadZip).bySegment.get(id.toLowerCase())||[]).filter(item=>{
    const parts=pathParts(item.name),at=parts.indexOf(id.toLowerCase());
    return at>=0&&(!pluginId||parts.slice(0,at).includes(pluginId.toLowerCase())||parts.length-at>1);
   }):[];
