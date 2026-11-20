@@ -18,19 +18,17 @@ function rememberColor(key,color){
   localStorage.setItem(key,JSON.stringify(next));
  }catch(error){console.warn('Could not save appearance color history',error)}
 }
-function setFavicon(accent){
- const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="2" y="2" width="60" height="60" rx="15" fill="'+accent+'"/><text x="32" y="47" text-anchor="middle" font-family="Arial,sans-serif" font-size="45" font-weight="800" fill="#10141d">q</text></svg>';
- const link=document.querySelector('link[rel~="icon"]');if(link)link.href='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
-}
+function setFavicon(){const link=document.querySelector('link[rel~="icon"]');if(link)link.href='assets/favicon.svg'}
 export function applyAccent(color,remember=true){
  const value=/^#[0-9a-f]{6}$/i.test(color)?color:'#b9f27c';
  document.documentElement.style.setProperty('--accent',value);
+ document.documentElement.style.setProperty('--accent-hover','color-mix(in srgb, '+value+' 12%, var(--panel))');
  document.documentElement.style.setProperty('--auto-read-highlight',value);
  localStorage.setItem('qrAccent',value);
  localStorage.setItem('qrAutoReadHighlight',value);
  if(remember)rememberColor('qrAccentHistory',value);
  const input=$('autoReadHighlightColor');if(input)input.value=value;
- setFavicon(value);
+ setFavicon();
 }
 export function applyBackground(color,remember=true){
  const value=/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(color)?color:null;
@@ -40,6 +38,13 @@ export function applyBackground(color,remember=true){
  document.documentElement.style.setProperty('--panel2','color-mix(in srgb, '+value+' 78%, var(--fg))');
  localStorage.setItem('qrBackground',value);
  if(remember)rememberColor('qrBackgroundHistory',value);
+}
+export function applyHoverColor(color,remember=true){
+ const value=/^#[0-9a-f]{6}$/i.test(color)?color:null;
+ if(!value){localStorage.removeItem('qrHoverColor');document.documentElement.style.setProperty('--hover','color-mix(in srgb,var(--fg) 8%,var(--panel))');return}
+ document.documentElement.style.setProperty('--hover',value);
+ localStorage.setItem('qrHoverColor',value);
+ if(remember)rememberColor('qrHoverColorHistory',value);
 }
 export function applyTextColor(color,remember=true){
  const value=/^#[0-9a-f]{6}$/i.test(color)?color:null;
@@ -57,8 +62,9 @@ export function applyTheme(name){
  localStorage.setItem('qbtheme',name);
  if($('readerTheme'))$('readerTheme').value=name;
  const accent=localStorage.getItem('qrAccent')||palette.accent;
- if(localStorage.getItem('qrAccent'))applyAccent(accent,false);else{document.documentElement.style.setProperty('--auto-read-highlight',accent);localStorage.setItem('qrAutoReadHighlight',accent);setFavicon(accent)}
+ if(localStorage.getItem('qrAccent'))applyAccent(accent,false);else{document.documentElement.style.setProperty('--auto-read-highlight',accent);localStorage.setItem('qrAutoReadHighlight',accent);setFavicon()}
  const background=localStorage.getItem('qrBackground');if(background)applyBackground(background,false);
  const textColor=localStorage.getItem('qrTextColor');if(textColor)applyTextColor(textColor,false);
+ const hoverColor=localStorage.getItem('qrHoverColor');if(hoverColor)applyHoverColor(hoverColor,false);else applyHoverColor(null,false);
 }
 export function initTheme(){applyTheme(localStorage.getItem('qbtheme')||'default')}
