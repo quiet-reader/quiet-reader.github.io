@@ -1773,3 +1773,13 @@ button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.action
  .image-tools-heading-actions button{flex:0 0 auto}
  .image-tools-heading-actions #imageToolPaste{flex:1}
 }
+
+/* Rich clipboard gallery import preview */
+.clipboard-gallery-import{max-height:72vh;overflow:auto}
+.clipboard-gallery-entry{display:grid;grid-template-columns:minmax(120px,34%) minmax(0,1fr);gap:12px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.clipboard-gallery-entry>img{width:100%;max-height:230px;object-fit:contain;background:#111;border-radius:7px;align-self:start}
+.clipboard-gallery-entry .stack{min-width:0}
+.clipboard-gallery-entry label{font-size:11px}
+.clipboard-gallery-entry input,.clipboard-gallery-entry textarea{width:100%;min-width:0}
+.clipboard-gallery-entry textarea{resize:vertical}
+@media(max-width:520px){.clipboard-gallery-entry{grid-template-columns:1fr}.clipboard-gallery-entry>img{max-height:190px}}
