@@ -219,7 +219,7 @@ async function readClipboardGalleryItem(item,index){
  const htmlText=clipboardHtmlText(html),description=plain.trim()||htmlText,workId=clipboardWorkId(plain)||clipboardWorkId(htmlText);
  const metadataText=plain.trim()||htmlText;
  const readField=label=>metadataText.split(/\r?\n/).map(line=>line.trim()).find(line=>new RegExp('^(?:'+label+')\\s*[:：]','i').test(line))?.replace(/^[^:：]+[:：]\\s*/,'').trim()||'';
- const metadata={id:workId,title:readField('title|name'),artist:readField('artist|author|user'),tags:readField('tags?'),description:metadataText.match(/(?:^|\\r?\\n)\\s*description\\s*[:：]\\s*([\\s\\S]*)$/i)?.[1]?.trim()||readField('description')||description};
+ const metadata={id:workId,title:readField('title|name'),artist:readField('artist|author|user'),tags:readField('tags?'),description:metadataText.match(/(?:^|\r?\n)\s*description\s*[:：]\s*([\s\S]*)$/i)?.[1]?.trim()||readField('description')||description};
  let blob=null;
  if(html){
   try{const doc=new DOMParser().parseFromString(html,'text/html'),image=doc.querySelector('img[src]');if(image)blob=clipboardBlobFromDataUrl(image.getAttribute('src'))}catch{}
