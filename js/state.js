@@ -41,7 +41,7 @@ function setReaderViewport(enabled){
 }
 export function setScreen(name){
  state.screen=name;
- for(const id of ['paste','library','book','editor','reader'])document.getElementById('screen-'+id).classList.toggle('hidden',id!==name);
+ for(const id of ['paste','library','book','editor','reader','tools'])document.getElementById('screen-'+id).classList.toggle('hidden',id!==name);
  if(name==='reader'){setBookViewport(false);setReaderViewport(true)}
  else{setReaderViewport(false);setBookViewport(name==='book')}
  document.getElementById('drawer').classList.remove('open');
