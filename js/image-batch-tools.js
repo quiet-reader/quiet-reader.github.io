@@ -54,7 +54,6 @@ export function initImageBatchTools() {
   const start = async (files, sourceLabel) => {
     if (!files.length) return;
     if (!window.JSZip) { setStatus('ZIP support is unavailable. Reload the app and try again.'); return; }
-    const defaults = {format:'webp',quality:85,maxWidth:0,maxHeight:0,crop:'none',anchor:'center-center'};
     modal('Batch image editor', `
       <div class="image-batch-setup">
         <p class="muted tiny">${files.length} image(s) selected from ${esc(sourceLabel)}. These settings will be applied to every image. Originals are never changed.</p>
@@ -117,7 +116,7 @@ export function initImageBatchTools() {
     const updateTotals=()=>{totals.innerHTML='<b>'+bytes(inputTotal)+'</b> original <span>→</span> <b>'+bytes(outputTotal)+'</b> processed <span>·</span> '+(inputTotal ? ((1-outputTotal/inputTotal)*100).toFixed(1)+'% smaller' : '—');};
     for (let index=0;index<files.length;index++) {
       const item=files[index];
-      inputTotal+=item.file.size;
+      inputTotal+=item.size ?? item.file?.size ?? 0;
       count.textContent=completed+' / '+files.length;
       stage.textContent='Processing '+item.path;
       const row=document.createElement('div');
@@ -125,7 +124,8 @@ export function initImageBatchTools() {
       row.innerHTML='<span class="image-batch-row-name">'+esc(item.path)+'</span><span class="image-batch-row-size">Processing…</span>';
       list.append(row);
       try {
-        const image=await decode(item.file);
+        const file=item.file || await item.getFile();
+        const image=await decode(file);
         const ratio=settings.crop==='none'?0:Number(settings.crop);
         const crop=cropFor(image.naturalWidth,image.naturalHeight,ratio,settings.anchor);
         let width=crop.width, height=crop.height;
@@ -141,8 +141,8 @@ export function initImageBatchTools() {
         zip.file(name,blob,{date:new Date()});
         outputTotal+=blob.size; completed++;
         row.classList.add('is-done');
-        row.querySelector('.image-batch-row-size').textContent=bytes(item.file.size)+' → '+bytes(blob.size)+' · '+(item.file.size?((1-blob.size/item.file.size)*100).toFixed(1)+'%':'—');
-        rows.push({name,input:item.file.size,output:blob.size});
+        row.querySelector('.image-batch-row-size').textContent=bytes(file.size)+' → '+bytes(blob.size)+' · '+(file.size?((1-blob.size/file.size)*100).toFixed(1)+'%':'—');
+        rows.push({name,input:file.size,output:blob.size});
         image.close?.();
       } catch(error) {
         failed++; row.classList.add('is-failed');
@@ -189,8 +189,7 @@ export function initImageBatchTools() {
       const archive=await JSZip.loadAsync(file);
       const entries=Object.values(archive.files).filter(entry=>!entry.dir&&IMAGE_EXT.test(entry.name)&&!entry.name.split('/').some(part=>part.startsWith('.')));
       if(!entries.length){setStatus('No supported images were found in that ZIP archive.');return;}
-      const items=[];
-      for(const entry of entries){items.push({file:await imageFile(entry,entry.name),path:entry.name});}
+      const items=entries.map(entry=>({path:entry.name,size:entry._data?.uncompressedSize||0,getFile:()=>imageFile(entry,entry.name)}));
       start(items,'ZIP archive');
     }catch(error){setStatus('Could not read ZIP archive: '+(error?.message||'invalid ZIP'));}
   });
