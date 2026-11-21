@@ -37,10 +37,18 @@ export function initImageTools() {
   let sourceImage = null, sourceUrl = null, sourceFile = null, outputBlob = null, outputUrl = null;
   let imageMetadata = { id: '', title: '', artist: '', tags: '', description: '' };
   const metadataFields = { id: $('imageToolMetaId'), title: $('imageToolMetaTitle'), artist: $('imageToolMetaArtist'), tags: $('imageToolMetaTags'), description: $('imageToolMetaDescription') };
+  const outputMetadata = $('imageToolOutputMetadata');
   const readMetadata = () => Object.fromEntries(Object.entries(metadataFields).map(([key,field]) => [key, field?.value?.trim() || '']));
+  const renderMetadataSummary = () => {
+    if (!outputMetadata) return;
+    const metadata = readMetadata();
+    const rows = ['id','title','artist','tags','description'].filter(key => metadata[key]);
+    outputMetadata.innerHTML = rows.length ? rows.map(key => '<span><b>' + key[0].toUpperCase() + key.slice(1) + ':</b> ' + metadata[key].replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])) + '</span>').join('') : '<span class="muted tiny">No image details attached.</span>';
+  };
   const setMetadata = value => {
     imageMetadata = { id: '', title: '', artist: '', tags: '', description: '', ...(value || {}) };
     Object.entries(metadataFields).forEach(([key,field]) => { if (field) field.value = imageMetadata[key] || ''; });
+    renderMetadataSummary();
   };
   const metadataPlain = value => [
     value.id && 'ID: ' + value.id, value.title && 'Title: ' + value.title,
@@ -427,5 +435,5 @@ export function initImageTools() {
     event.preventDefault();
     await previewClipboardFile(file, metadata);
   });
-  Object.values(metadataFields).forEach(field => field?.addEventListener('input', () => { imageMetadata = readMetadata(); }));
+  Object.values(metadataFields).forEach(field => field?.addEventListener('input', () => { imageMetadata = readMetadata(); renderMetadataSummary(); }));
 }
