@@ -220,11 +220,11 @@ async function readClipboardGalleryItem(item,index){
  const readField=label=>metadataText.split(/\r?\n/).map(line=>line.trim()).find(line=>new RegExp('^(?:'+label+')\\s*[:：]','i').test(line))?.replace(/^[^:：]+[:：]\\s*/,'').trim()||'';
  const metadata={id:workId,title:readField('title|name'),artist:readField('artist|author|user'),tags:readField('tags?'),description:readField('description')||description};
  let blob=null;
- const imageType=types.find(type=>type.startsWith('image/'));
- if(imageType)blob=await item.getType(imageType);
- if(!blob&&html){
+ if(html){
   try{const doc=new DOMParser().parseFromString(html,'text/html'),image=doc.querySelector('img[src]');if(image)blob=clipboardBlobFromDataUrl(image.getAttribute('src'))}catch{}
  }
+ const imageType=types.find(type=>type.startsWith('image/'));
+ if(!blob&&imageType)blob=await item.getType(imageType);
  if(!blob||!blob.type.startsWith('image/'))return null;
  const extension=({'image/jpeg':'jpg','image/svg+xml':'svg'})[blob.type]||blob.type.split('/')[1]?.replace(/^x-/,'')||'png';
  const baseName=workId||'Pasted image '+(index+1);
