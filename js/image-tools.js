@@ -120,6 +120,9 @@ export function initImageTools() {
   const updatePreview = async () => {
     if (!sourceImage) return;
     const generation = ++renderGeneration;
+    outputBlob = null;
+    copyButton.disabled = true;
+    downloadButton.disabled = true;
     drawOriginal();
     drawOutput();
     let blob;
