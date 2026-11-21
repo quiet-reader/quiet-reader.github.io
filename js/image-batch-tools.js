@@ -180,7 +180,7 @@ export function initImageBatchTools() {
           stage.textContent='Creating ZIP archive · '+Math.round(meta.percent)+'%';
         });
         save.disabled=false;
-        const archiveBase=(settings.archiveName || 'quiet-reader-edited-images').replace(/\\.zip$/i,'').replace(/[\\/:*?"<>|]/g,'-').trim() || 'quiet-reader-edited-images';
+        const archiveBase=(settings.archiveName || 'quiet-reader-edited-images').replace(/\.zip$/i,'').replace(/[\\/:*?"<>|]/g,'-').trim() || 'quiet-reader-edited-images';
         save.onclick=()=>download(archive,archiveBase+'.zip');
         saveFolder.disabled = typeof window.showDirectoryPicker !== 'function';
         saveFolder.onclick=async()=>{
@@ -232,7 +232,7 @@ export function initImageBatchTools() {
       const entries=Object.values(archive.files).filter(entry=>!entry.dir&&IMAGE_EXT.test(entry.name)&&!entry.name.split('/').some(part=>part.startsWith('.')));
       if(!entries.length){setStatus('No supported images were found in that ZIP archive.');return;}
       const items=entries.map(entry=>({path:entry.name,size:entry._data?.uncompressedSize||0,getFile:()=>imageFile(entry,entry.name)}));
-      start(items,'ZIP archive',file.name.replace(/\\.zip$/i,'')+'-edited');
+      start(items,'ZIP archive',file.name.replace(/\.zip$/i,'')+'-edited');
     }catch(error){setStatus('Could not read ZIP archive: '+(error?.message||'invalid ZIP'));}
   });
 }
