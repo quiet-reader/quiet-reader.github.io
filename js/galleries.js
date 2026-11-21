@@ -52,8 +52,30 @@ export async function importGalleryFiles(fileList){
 }
 async function copyImage(image){
  if(!image)return;
- try{const response=await fetch(image.data),blob=await response.blob();if(navigator.clipboard?.write&&window.ClipboardItem){await navigator.clipboard.write([new ClipboardItem({[blob.type||'image/png']:blob})]);toast('Image copied');return}}catch(error){}
- try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(image.data);toast('Image data URL copied · image clipboard unavailable')}else toast('Image clipboard is unavailable in this browser')}catch(error){toast('Could not copy image in this browser')}
+ try{
+  const metadata={...(image.metadata||{}),description:image.metadata?.description||image.notes||''};
+  const plain=[metadata.id&&'ID: '+metadata.id,metadata.title&&'Title: '+metadata.title,metadata.artist&&'Artist: '+metadata.artist,metadata.tags&&'Tags: '+metadata.tags,metadata.description&&'Description: '+metadata.description].filter(Boolean).join('\\n');
+  const html='<div><img src="'+image.data+'" alt="'+esc(metadata.title||image.name||'Gallery image')+'"><div>'+['id','title','artist','tags','description'].filter(key=>metadata[key]).map(key=>'<p><strong>'+key[0].toUpperCase()+key.slice(1)+':</strong> '+esc(metadata[key])+'</p>').join('')+'</div></div>';
+  if(navigator.clipboard?.write&&window.ClipboardItem){
+   await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([plain],{type:'text/plain'})})]);
+   toast('Image and details copied');return;
+  }
+  if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(plain||image.data);toast('Metadata copied as text · rich clipboard unavailable');return}
+  toast('Image clipboard is unavailable in this browser');
+ }catch(error){toast('Could not copy image and details in this browser')}
+}
+function confirmGalleryDelete(imageName){
+ return new Promise(resolve=>{
+  let settled=false;
+  const finish=value=>{if(settled)return;settled=true;closeModal();resolve(value)};
+  const body='<div class="gallery-delete-confirm"><p>Delete <b>'+esc(imageName||'this image')+'</b> from this gallery?</p><p class="muted tiny">This removes the image from this gallery. It cannot be undone unless you have a backup.</p><div class="row wrap"><button type="button" id="cancelGalleryDelete">Cancel</button><span class="grow"></span><button type="button" id="confirmGalleryDelete" class="danger">Delete image</button></div></div>';
+  modal('Delete image?',body,()=>{
+   $('modalClose').onclick=()=>finish(false);
+   $('cancelGalleryDelete').onclick=()=>finish(false);
+   $('confirmGalleryDelete').onclick=()=>finish(true);
+   $('modalBack').addEventListener('click',event=>{if(event.target.id==='modalBack')finish(false)});
+  });
+ }
 }
 async function openImage(index){
  const book=state.book,gallery=ensureGallery(book),image=gallery.images[index];if(!image)return;
@@ -105,7 +127,7 @@ function showImageViewer(index){
    if(event.target.closest('#copyViewerImage')){await copyImage(current);return}
    if(event.target.closest('#saveGalleryImageNote')){current.notes=$('galleryImageNotes').value;await persist(book);toast('Image note saved');return}
    if(event.target.closest('#toggleImageLock')){current.locked=!current.locked;await persist(book);updateViewer();renderGallery();toast(current.locked?'Image locked':'Image unlocked');return}
-   if(event.target.closest('#deleteViewerImage')){if(current.locked||book.locked)return toast('Unlock this image and gallery before deleting');if(!confirm('Delete this image from the gallery?'))return;images.splice(sliderIndex,1);addEditEvent(book,'Gallery image deleted',current.name||'Image');await persist(book);if(!images.length){if(viewerKeyHandler)document.removeEventListener('keydown',viewerKeyHandler);viewerKeyHandler=null;closeModal();renderGallery();toast('Image deleted');return}sliderIndex=Math.min(sliderIndex,images.length-1);viewerZoom=1;panX=0;panY=0;await setViewerIndexAfterDelete()}
+   if(event.target.closest('#deleteViewerImage')){if(current.locked||book.locked)return toast('Unlock this image and gallery before deleting');if(!(await confirmGalleryDelete(current.name)))return;images.splice(sliderIndex,1);addEditEvent(book,'Gallery image deleted',current.name||'Image');await persist(book);if(!images.length){if(viewerKeyHandler)document.removeEventListener('keydown',viewerKeyHandler);viewerKeyHandler=null;closeModal();renderGallery();toast('Image deleted');return}sliderIndex=Math.min(sliderIndex,images.length-1);viewerZoom=1;panX=0;panY=0;await setViewerIndexAfterDelete()}
   };
   const setViewerIndexAfterDelete=async()=>{const current=images[sliderIndex],now=Date.now();current.lastOpenedAt=now;gallery.lastOpenedAt=now;current.history=(current.history||[]).concat({openedAt:now}).slice(-10);gallery.history=(gallery.history||[]).concat({imageId:current.id,imageName:current.name||'Image',openedAt:now}).slice(-10);await persist(book);renderGallery();updateViewer()};
   if(viewerKeyHandler)document.removeEventListener('keydown',viewerKeyHandler);
