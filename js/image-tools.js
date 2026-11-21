@@ -309,19 +309,30 @@ export function initImageTools() {
   canvas.addEventListener('pointercancel', () => { cropStart = null; });
 
   copyButton.addEventListener('click', async () => {
-    if (!outputBlob) return;
     try {
+      // Flush any pending debounce so Copy always uses the settings currently visible in the editor.
+      clearTimeout(previewTimer);
+      await updatePreview();
+      if (!outputBlob) return;
       if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Image clipboard writing is not supported in this browser. Use Download image instead.');
       let clipboardBlob = outputBlob;
       let clipboardNote = '';
-      if (typeof ClipboardItem.supports === 'function' && !ClipboardItem.supports(outputBlob.type)) {
-        // Clipboard image formats are browser/OS constrained (commonly PNG only).
-        // Re-encode the already processed canvas, never the original source image.
+      const pngOnly = typeof ClipboardItem.supports === 'function' && !ClipboardItem.supports(outputBlob.type);
+      if (pngOnly) {
         clipboardBlob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/png'));
-        clipboardNote = ' (clipboard format PNG; processed dimensions and edits retained)';
+        clipboardNote = ' (clipboard uses PNG; resized/cropped/edited output retained)';
       }
       if (!clipboardBlob) throw new Error('This browser could not prepare a clipboard-compatible image. Use Download image instead.');
-      await navigator.clipboard.write([new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })]);
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })]);
+      } catch (error) {
+        // Older clipboard implementations may not expose ClipboardItem.supports().
+        if (pngOnly || outputBlob.type === 'image/png' || !/NotSupported|not supported|unsupported/i.test(error?.name + ' ' + error?.message)) throw error;
+        clipboardBlob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/png'));
+        if (!clipboardBlob) throw error;
+        await navigator.clipboard.write([new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })]);
+        clipboardNote = ' (clipboard uses PNG; resized/cropped/edited output retained)';
+      }
       setStatus('Processed output image copied to clipboard' + clipboardNote + '.');
     } catch (error) { setStatus(error.message || 'Could not copy image to clipboard.'); }
   });
