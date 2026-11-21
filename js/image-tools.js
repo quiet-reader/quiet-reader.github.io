@@ -196,7 +196,7 @@ export function initImageTools() {
     clearTimeout(previewTimer);
     previewTimer = setTimeout(updatePreview, 120);
   };
-  const loadFile = async file => {
+  const loadFile = async (file, metadata = null) => {
     if (!file || !file.type.startsWith('image/') || file.type === 'image/svg+xml') {
       setStatus('Choose a raster image. SVG files are not opened to prevent embedded external resources from loading.');
       return;
@@ -204,6 +204,7 @@ export function initImageTools() {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     if (outputUrl) URL.revokeObjectURL(outputUrl);
     sourceFile = file;
+    if (metadata) setMetadata(metadata);
     outputBlob = null;
     outputUrl = null;
     $('imageToolOutputPreview').removeAttribute('src');
@@ -232,13 +233,13 @@ export function initImageTools() {
     sourceImage.onerror = () => setStatus('This image could not be decoded by the browser.');
     sourceImage.src = sourceUrl;
   };
-  const previewClipboardFile = async file => {
+  const previewClipboardFile = async (file, metadata = null) => {
     if (!file) return false;
     if (!(await confirmImagePreview(file, { title: 'Preview image to edit', confirmLabel: 'Open in editor' }))) {
       setStatus('Paste cancelled. The editor image was not changed.');
       return false;
     }
-    await loadFile(file);
+    await loadFile(file, metadata);
     return true;
   };
 
@@ -259,14 +260,10 @@ export function initImageTools() {
       if (!navigator.clipboard?.read) throw new Error('Clipboard image reading is not supported here. Use Choose image instead.');
       const items = await navigator.clipboard.read();
       for (const item of items) {
-        const type = item.types.find(value => value.startsWith('image/'));
-        if (type) {
-          const blob = await item.getType(type);
-          await previewClipboardFile(new File([blob], 'pasted-image.' + (type.split('/')[1] || 'png'), { type }));
-          return;
-        }
+        const payload = await readRichClipboardItem(item);
+        if (payload) { await previewClipboardFile(payload.file, payload.metadata); return; }
       }
-      throw new Error('No image found on the clipboard.');
+      throw new Error('No image found on the clipboard. Text or external image links alone are not enough.');
     } catch (error) { setStatus(error.message || 'Could not read clipboard image.'); }
   });
 
@@ -356,30 +353,32 @@ export function initImageTools() {
 
   copyButton.addEventListener('click', async () => {
     try {
-      // Flush any pending debounce so Copy always uses the settings currently visible in the editor.
       clearTimeout(previewTimer);
       await updatePreview();
       if (!outputBlob) return;
-      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Image clipboard writing is not supported in this browser. Use Download image instead.');
-      let clipboardBlob = outputBlob;
-      let clipboardNote = '';
-      const pngOnly = typeof ClipboardItem.supports === 'function' && !ClipboardItem.supports(outputBlob.type);
-      if (pngOnly) {
-        clipboardBlob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/png'));
-        clipboardNote = ' (clipboard uses PNG; resized/cropped/edited output retained)';
-      }
-      if (!clipboardBlob) throw new Error('This browser could not prepare a clipboard-compatible image. Use Download image instead.');
+      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Rich image clipboard writing is not supported. Use Download output instead.');
+      const metadata = readMetadata(); imageMetadata = metadata;
+      const imageUrl = await blobDataUrl(outputBlob);
+      const escapeHtml = value => String(value || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+      const plain = metadataPlain(metadata);
+      const html = '<div><img src="' + imageUrl + '" alt="' + escapeHtml(metadata.title || metadata.id || sourceFile?.name || 'Image') + '"><div>' +
+        ['id','title','artist','tags','description'].filter(key => metadata[key]).map(key => '<p><strong>' + key[0].toUpperCase() + key.slice(1) + ':</strong> ' + escapeHtml(metadata[key]) + '</p>').join('') + '</div></div>';
+      const png = outputBlob.type === 'image/png' ? outputBlob : await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/png'));
+      if (!png) throw new Error('Could not prepare a clipboard-compatible image.');
+      const htmlBlob = new Blob([html], {type:'text/html'}), textBlob = new Blob([plain], {type:'text/plain'});
+      let note = '';
       try {
-        await navigator.clipboard.write([new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })]);
-      } catch (error) {
-        // Older clipboard implementations may not expose ClipboardItem.supports().
-        if (pngOnly || outputBlob.type === 'image/png' || !/NotSupported|not supported|unsupported/i.test(error?.name + ' ' + error?.message)) throw error;
-        clipboardBlob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/png'));
-        if (!clipboardBlob) throw error;
-        await navigator.clipboard.write([new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })]);
-        clipboardNote = ' (clipboard uses PNG; resized/cropped/edited output retained)';
+        await navigator.clipboard.write([new ClipboardItem({'image/png':png,'text/html':htmlBlob,'text/plain':textBlob})]);
+      } catch {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({'text/html':htmlBlob,'text/plain':textBlob})]);
+          note = ' (rich HTML and metadata copied; browser did not accept the native image representation)';
+        } catch {
+          await navigator.clipboard.write([new ClipboardItem({'image/png':png})]);
+          note = ' (browser accepted image only; rich metadata clipboard formats are unavailable)';
+        }
       }
-      setStatus('Processed output image copied to clipboard' + clipboardNote + '.');
+      setStatus('Processed image and metadata copied' + note + '.');
     } catch (error) { setStatus(error.message || 'Could not copy image to clipboard.'); }
   });
   downloadButton.addEventListener('click', () => {
@@ -408,7 +407,16 @@ export function initImageTools() {
   });
   initImageBatchTools();
   screen.addEventListener('paste', async event => {
-    const file = [...(event.clipboardData?.items || [])].find(item => item.type.startsWith('image/'))?.getAsFile();
-    if (file) { event.preventDefault(); await previewClipboardFile(file); }
+    const clipboard = event.clipboardData;
+    if (!clipboard) return;
+    const file = [...(clipboard.items || [])].find(item => item.type.startsWith('image/'))?.getAsFile();
+    if (!file) return;
+    event.preventDefault();
+    const plain = clipboard.getData('text/plain') || '';
+    const html = clipboard.getData('text/html') || '';
+    let metadata = parseMetadata(plain);
+    if (!plain && html) { try { const doc = new DOMParser().parseFromString(html,'text/html'); metadata = parseMetadata(doc.body?.innerText || doc.body?.textContent || ''); } catch {} }
+    await previewClipboardFile(file, metadata);
   });
+  Object.values(metadataFields).forEach(field => field?.addEventListener('input', () => { imageMetadata = readMetadata(); }));
 }
