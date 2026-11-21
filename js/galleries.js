@@ -129,7 +129,7 @@ function showImageViewer(index){
    const thumb=event.target.closest('[data-viewer-index]');if(thumb){await setViewerIndex(Number(thumb.dataset.viewerIndex),Number(thumb.dataset.viewerIndex)>sliderIndex?1:-1);return}
    const current=images[sliderIndex];
    if(event.target.closest('#copyViewerImage')){await copyImage(current);return}
-   if(event.target.closest('#saveGalleryImageNote')){current.notes=$('galleryImageNotes').value;await persist(book);toast('Image note saved');return}
+   if(event.target.closest('#saveGalleryImageNote')){current.notes=$('galleryImageNotes').value;current.metadata={...(current.metadata||{}),description:current.notes};await persist(book);toast('Image note saved');return}
    if(event.target.closest('#toggleImageLock')){current.locked=!current.locked;await persist(book);updateViewer();renderGallery();toast(current.locked?'Image locked':'Image unlocked');return}
    if(event.target.closest('#deleteViewerImage')){if(current.locked||book.locked)return toast('Unlock this image and gallery before deleting');if(!(await confirmGalleryDelete(current.name)))return;images.splice(sliderIndex,1);addEditEvent(book,'Gallery image deleted',current.name||'Image');await persist(book);if(!images.length){if(viewerKeyHandler)document.removeEventListener('keydown',viewerKeyHandler);viewerKeyHandler=null;closeModal();renderGallery();toast('Image deleted');return}sliderIndex=Math.min(sliderIndex,images.length-1);viewerZoom=1;panX=0;panY=0;await setViewerIndexAfterDelete()}
   };
@@ -219,7 +219,7 @@ async function readClipboardGalleryItem(item,index){
  const htmlText=clipboardHtmlText(html),description=plain.trim()||htmlText,workId=clipboardWorkId(plain)||clipboardWorkId(htmlText);
  const metadataText=plain.trim()||htmlText;
  const readField=label=>metadataText.split(/\r?\n/).map(line=>line.trim()).find(line=>new RegExp('^(?:'+label+')\\s*[:：]','i').test(line))?.replace(/^[^:：]+[:：]\\s*/,'').trim()||'';
- const metadata={id:workId,title:readField('title|name'),artist:readField('artist|author|user'),tags:readField('tags?'),description:readField('description')||description};
+ const metadata={id:workId,title:readField('title|name'),artist:readField('artist|author|user'),tags:readField('tags?'),description:metadataText.match(/(?:^|\\r?\\n)\\s*description\\s*[:：]\\s*([\\s\\S]*)$/i)?.[1]?.trim()||readField('description')||description};
  let blob=null;
  if(html){
   try{const doc=new DOMParser().parseFromString(html,'text/html'),image=doc.querySelector('img[src]');if(image)blob=clipboardBlobFromDataUrl(image.getAttribute('src'))}catch{}
@@ -239,7 +239,7 @@ async function confirmClipboardGalleryImport(items){
   const body='<div class="stack clipboard-gallery-import"><p class="muted tiny">The image, filename and copied description are read from the clipboard. The ID is used as the default filename when present.</p>'+previews.map((entry,index)=>'<section class="clipboard-gallery-entry"><img src="'+entry.url+'" alt="'+esc(entry.item.name)+'"><div class="stack"><label>Image filename<input data-clipboard-name="'+index+'" value="'+esc(entry.item.name)+'"></label><label>Details / description<textarea data-clipboard-notes="'+index+'" rows="5">'+esc(entry.item.notes)+'</textarea></label></div></section>').join('')+'<div class="row wrap"><button type="button" id="cancelClipboardGallery">Cancel</button><span class="grow"></span><button type="button" id="confirmClipboardGallery" class="primary">Add '+previews.length+' image'+(previews.length===1?'':'s')+'</button></div></div>';
   modal('Preview pasted gallery image'+(previews.length===1?'':'s'),body,()=>{
    $('modalClose').onclick=()=>finish(null);$('cancelClipboardGallery').onclick=()=>finish(null);
-   $('confirmClipboardGallery').onclick=()=>finish(previews.map((entry,index)=>({file:entry.item.file,name:document.querySelector('[data-clipboard-name="'+index+'"]').value.trim(),notes:document.querySelector('[data-clipboard-notes="'+index+'"]').value,metadata:entry.item.metadata})));
+   $('confirmClipboardGallery').onclick=()=>finish(previews.map((entry,index)=>({file:entry.item.file,name:document.querySelector('[data-clipboard-name="'+index+'"]').value.trim(),notes:document.querySelector('[data-clipboard-notes="'+index+'"]').value,metadata:{...(entry.item.metadata||{}),description:document.querySelector('[data-clipboard-notes="'+index+'"]').value}})));
    $('modalBack').addEventListener('click',event=>{if(event.target.id==='modalBack')finish(null)});
   });
  });
@@ -310,7 +310,7 @@ export function renderGallery(){
   const selection=event.target.closest('[data-image-select]');if(selection){const image=images[Number(selection.dataset.imageSelect)];if(!image||image.locked)return;selection.checked?selectedImageIds.add(image.id):selectedImageIds.delete(image.id);const count=host.querySelector('[data-selected-count]');if(count)count.textContent=selectedImageIds.size+' selected';return}
   const field=event.target.closest('[data-image-note]');if(!field)return;
   const image=images[Number(field.dataset.imageNote)];if(!image||book.locked||image.locked)return;
-  image.notes=field.value;await persist(book);toast('Image note saved');
+  image.notes=field.value;image.metadata={...(image.metadata||{}),description:image.notes};await persist(book);toast('Image note saved');
  };
  if(!images.length){host.innerHTML+='<div class="empty">This gallery is empty. Add images or paste one from the clipboard.</div>';return}
  if(view==='grid'){
