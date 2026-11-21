@@ -139,6 +139,8 @@ export function initImageTools() {
     sourceImage.onload = async () => {
       aspectRatio = sourceImage.naturalWidth / sourceImage.naturalHeight;
       cropRect = null;
+      selectionRect = null;
+      cropStart = null;
       cropMode = false;
       cropButton.disabled = false;
       applyCropButton.disabled = true;
@@ -193,7 +195,10 @@ export function initImageTools() {
     document.querySelectorAll('[data-image-quality]').forEach(item => item.classList.toggle('active', item === button));
     schedulePreview();
   }));
-  [format, textInput, textSize, textColor, textPosition].forEach(input => input.addEventListener('input', schedulePreview));
+  [format, textInput, textSize, textColor, textPosition].forEach(input => {
+    input.addEventListener('input', schedulePreview);
+    input.addEventListener('change', schedulePreview);
+  });
   resizeWidth.addEventListener('change', () => {
     const width = Math.max(1, Number(resizeWidth.value) || 1);
     if (keepRatio.checked) resizeHeight.value = Math.max(1, Math.round(width / aspectRatio));
@@ -261,8 +266,10 @@ export function initImageTools() {
     if (selectionRect.width < 2 || selectionRect.height < 2) selectionRect = null;
     applyCropButton.disabled = !selectionRect;
     if (selectionRect) setStatus('Crop area selected: ' + Math.round(selectionRect.width) + ' × ' + Math.round(selectionRect.height) + ' px');
+    cropStart = null;
     drawSource();
   });
+  canvas.addEventListener('pointercancel', () => { cropStart = null; });
   copyButton.addEventListener('click', async () => {
     if (!outputBlob) return;
     try {
