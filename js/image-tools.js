@@ -66,7 +66,7 @@ export function initImageTools() {
         const doc = new DOMParser().parseFromString(html, 'text/html');
         htmlText = (doc.body?.innerText || doc.body?.textContent || '').trim();
         const src = doc.querySelector('img[src]')?.getAttribute('src') || '';
-        const match = src.match(/^data:(image\\/[^;,]+);base64,([\\s\\S]*)$/i);
+        const match = src.match(/^data:(image\/[^;,]+);base64,([\s\S]*)$/i);
         if (match) embeddedImage = new Blob([Uint8Array.from(atob(match[2]), ch => ch.charCodeAt(0))], { type: match[1] });
       } catch {}
     }
@@ -419,7 +419,7 @@ export function initImageTools() {
         const htmlText = doc.body?.innerText || doc.body?.textContent || '';
         if (!plain) metadata = parseMetadata(htmlText);
         const src = doc.querySelector('img[src]')?.getAttribute('src') || '';
-        const match = src.match(/^data:(image\\/[^;,]+);base64,([\\s\\S]*)$/i);
+        const match = src.match(/^data:(image\/[^;,]+);base64,([\s\S]*)$/i);
         if (match) file = new File([Uint8Array.from(atob(match[2]), ch => ch.charCodeAt(0))], (metadata.id || metadata.title || 'pasted-image') + '.' + (({'image/jpeg':'jpg','image/png':'png','image/webp':'webp'})[match[1]] || 'png'), {type:match[1]});
       } catch {}
     }
