@@ -210,7 +210,7 @@ async function confirmClipboardGalleryImport(items){
   const body='<div class="stack clipboard-gallery-import"><p class="muted tiny">The image, filename and copied description are read from the clipboard. The ID is used as the default filename when present.</p>'+previews.map((entry,index)=>'<section class="clipboard-gallery-entry"><img src="'+entry.url+'" alt="'+esc(entry.item.name)+'"><div class="stack"><label>Image filename<input data-clipboard-name="'+index+'" value="'+esc(entry.item.name)+'"></label><label>Details / description<textarea data-clipboard-notes="'+index+'" rows="5">'+esc(entry.item.notes)+'</textarea></label></div></section>').join('')+'<div class="row wrap"><button type="button" id="cancelClipboardGallery">Cancel</button><span class="grow"></span><button type="button" id="confirmClipboardGallery" class="primary">Add '+previews.length+' image'+(previews.length===1?'':'s')+'</button></div></div>';
   modal('Preview pasted gallery image'+(previews.length===1?'':'s'),body,()=>{
    $('modalClose').onclick=()=>finish(null);$('cancelClipboardGallery').onclick=()=>finish(null);
-   $('confirmClipboardGallery').onclick=()=>finish(previews.map((entry,index)=>({file:entry.item.file,name:$('[data-clipboard-name="'+index+'"]').value.trim(),notes:$('[data-clipboard-notes="'+index+'"]').value})));
+   $('confirmClipboardGallery').onclick=()=>finish(previews.map((entry,index)=>({file:entry.item.file,name:document.querySelector('[data-clipboard-name="'+index+'"]').value.trim(),notes:document.querySelector('[data-clipboard-notes="'+index+'"]').value})));
    $('modalBack').addEventListener('click',event=>{if(event.target.id==='modalBack')finish(null)});
   });
  });
@@ -223,8 +223,10 @@ export async function pasteGalleryImages(){
   for(const item of clipboardItems){const entry=await readClipboardGalleryItem(item,entries.length);if(entry)entries.push(entry)}
   if(!entries.length)return toast('No image data found. The clipboard may contain only text or an external image link.');
   const confirmed=await confirmClipboardGalleryImport(entries);if(!confirmed)return;
+  const normalized=confirmed.map(item=>({...item,name:item.name.replace(/[\\\\/:*?"<>|\\x00-\\x1f]/g,'_').trim()}));
+  if(normalized.some(item=>!item.name))return toast('Enter a valid filename for every image');
   const gallery=ensureGallery(book);let added=0;
-  for(const item of confirmed){try{const name=item.name.replace(/[\\\\/:*?"<>|\\x00-\\x1f]/g,'_').trim();if(!name)return toast('Enter a valid filename for every image');gallery.images.push({id:uid(),name,data:await dataURL(item.file),mime:item.file.type||'application/octet-stream',size:item.file.size,addedAt:Date.now(),lastOpenedAt:null,notes:item.notes,locked:false,history:[]});added++}catch(error){console.warn('Could not import clipboard gallery image',error)}}
+  for(const item of normalized){try{gallery.images.push({id:uid(),name:item.name,data:await dataURL(item.file),mime:item.file.type||'application/octet-stream',size:item.file.size,addedAt:Date.now(),lastOpenedAt:null,notes:item.notes,locked:false,history:[]});added++}catch(error){console.warn('Could not import clipboard gallery image',error)}}
   if(!book.cover&&gallery.images[0])book.cover=gallery.images[0].data;
   addEditEvent(book,'Gallery images pasted',added+' images');await persist(book);await refresh();drawBook();setBookTab('gallery');renderGallery();toast(added+' image'+(added===1?'':'s')+' added from clipboard');
  }catch(error){console.warn('Gallery clipboard import failed',error);toast('Could not read clipboard. Check Chrome clipboard permission and try again.')}
