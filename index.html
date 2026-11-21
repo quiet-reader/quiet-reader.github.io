@@ -61,6 +61,13 @@
      <canvas id="imageToolCanvas" class="hidden" aria-label="Original image and crop selection"></canvas>
     </div>
     <div class="image-tool-original-meta"><span>Original file size</span><b id="imageToolOriginalSize">—</b></div>
+    <details class="image-tool-metadata" open><summary>Image details · preserved while editing</summary><div class="image-tool-metadata-grid">
+     <label>ID<input id="imageToolMetaId" type="text" placeholder="Pixiv / work ID"></label>
+     <label>Title<input id="imageToolMetaTitle" type="text" placeholder="Artwork title"></label>
+     <label>Artist<input id="imageToolMetaArtist" type="text" placeholder="Artist / creator"></label>
+     <label>Tags<input id="imageToolMetaTags" type="text" placeholder="Comma-separated tags"></label>
+     <label class="image-tool-metadata-description">Description<textarea id="imageToolMetaDescription" rows="3" placeholder="Artwork description and source details"></textarea></label>
+    </div><p class="muted tiny">Details stay with the editor image record and are included when you copy the processed image. Downloaded image files contain the processed pixels; clipboard metadata is separate.</p></details>
    </div>
    <div class="image-tool-output-card">
     <div class="image-tool-preview-top"><div><b>Processed output</b><span id="imageToolOutputDimensions" class="muted tiny">Your edited image appears here</span></div><span class="image-tool-local-indicator"><span></span> Live preview</span></div>
