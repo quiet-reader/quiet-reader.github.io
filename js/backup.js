@@ -177,8 +177,7 @@ async function readZipArchive(file){
   if(Array.isArray(value)){for(let i=0;i<value.length;i++)value[i]=await hydrate(value[i]);return value}
   if(value&&typeof value==='object'){for(const key of Object.keys(value))value[key]=await hydrate(value[key]);return value}
   return value;
- }; const restored=[]; for(const ref of library.books){const item=await readItem(ref);if(item.kind!=='book'||item.id!==ref.id)throw new Error('A book entry does not match its library index.');restored.push(await hydrate(item))}
- for(const ref of library.pastes){const item=await readItem(ref);if(item.kind!=='paste'||item.id!==ref.id)throw new Error('A paste entry does not match its library index.');restored.push(item)}
+ }; const restored=[]; for(const ref of library.books){const item=await readItem(ref);if(item.kind!=='book'||item.id!==ref.id)throw new Error('A book entry does not match its library index.');restored.push(await hydrate(item))} for(const ref of library.pastes){const item=await readItem(ref);if(item.kind!=='paste'||item.id!==ref.id)throw new Error('A paste entry does not match its library index.');restored.push(item)}
  return {items:restored,theme:library.theme,preferences:library.preferences};
 }
 
@@ -188,19 +187,14 @@ const chapterFolderCache=new WeakMap();
 function zipFiles(zip){if(!zip||typeof zip!=='object')return [];let files=zipFileCache.get(zip);if(!files){files=Object.values(zip.files||{}).filter(entry=>!entry.dir);zipFileCache.set(zip,files)}return files}
 function zipPathIndex(zip){let index=zipPathIndexCache.get(zip);if(index)return index;const byPath=new Map(),bySegment=new Map();for(const entry of zipFiles(zip))byPath.set(normalizedZipPath(entry.name),entry);index={byPath,bySegment};zipPathIndexCache.set(zip,index);return index}
 function primeZipPathIndex(zip,novelRecords){
- const wanted=new Set();
- for(const record of novelRecords){
-  const novel=record.novel||{},novelId=String(novel.id??novel.novelId??'').toLowerCase();
-  if(novelId)wanted.add(novelId);
-  for(const chapter of normalizeChapterList(novel.chapters))for(const value of [chapter.id,chapter.chapterId,chapter.chapterNumber,chapter.position])if(value!==undefined&&value!==null)wanted.add(String(value).toLowerCase());
- }
+ const novelIds=new Set(novelRecords.map(record=>String(record.novel?.id??record.novel?.novelId??'').toLowerCase()).filter(Boolean));
  const byPath=new Map(),bySegment=new Map();
- // Traverse the directory once, but retain paths only for selected novel/chapter IDs.
+ // Traverse the directory once, but retain only paths belonging to selected novels.
  for(const entry of zipFiles(zip)){
-  const path=normalizedZipPath(entry.name),parts=new Set(pathParts(path));
-  if(![...parts].some(part=>wanted.has(part)))continue;
+  const path=normalizedZipPath(entry.name),parts=pathParts(path);
+  if(!parts.some(part=>novelIds.has(part)))continue;
   byPath.set(path,entry);
-  for(const part of parts){if(!bySegment.has(part))bySegment.set(part,[]);bySegment.get(part).push(entry)}
+  for(const part of new Set(parts)){if(!bySegment.has(part))bySegment.set(part,[]);bySegment.get(part).push(entry)}
  }
  zipPathIndexCache.set(zip,{byPath,bySegment});
 }
@@ -357,8 +351,11 @@ async function loadLNReaderContentSource(source){
  return null;
 }async function loadLNReaderContentArchives(prepared){
  const loaded=[...(prepared?.contentArchives||[])];
- for(const source of prepared?.contentSources||[]){
-  try{
+ const sources=[...(prepared?.contentSources||[])].sort((a,b)=>{
+  const priority=source=>source.label==='download.zip'?2:source.label==='novel-files.zip'?1:0;
+  return priority(a)-priority(b);
+ });
+ for(const source of sources){  try{
    const archive=await loadLNReaderContentSource(source);
    if(archive&&!loaded.includes(archive))loaded.push(archive);
   }catch(error){console.warn('LNReader content archive could not be opened',source.label||source.entry?.name||source.file?.name,error)}
@@ -537,8 +534,7 @@ async function readLNReaderArchive(prepared,onBook,selectedEntryNames){
    if(chapter.readTime)book.readingHistory.push({chapter:chapterIndex,readAt:chapter.readTime});
    book.chapters.push({
     title:String(chapter.name||chapter.title||'Chapter '+(position+1)),text,images,
-    createdAt:chapter.releaseTime?new Date(chapter.releaseTime).getTime()||now:now,
-    updatedAt:chapter.updatedTime?new Date(chapter.updatedTime).getTime()||now:now,
+    createdAt:chapter.releaseTime?new Date(chapter.releaseTime).getTime()||now:now,    updatedAt:chapter.updatedTime?new Date(chapter.updatedTime).getTime()||now:now,
     lnReader:{id:chapter.id,url:lnReaderChapterUrl(chapter,novel),path:chapter.path||'',chapterNumber:chapter.chapterNumber??position+1,page:chapter.page??'1',scanlator:chapter.scanlator||'',read:chapter.unread===false,downloaded:Boolean(chapter.isDownloaded)||Boolean(text||images.length),progress:Number(chapter.progress)||0,timeSpent:Number(chapter.timeSpent)||0}
    });
    if(chapter.bookmark)book.bookmarks.push({id:safeId(),chapter:chapterIndex,offset:0,text:String(chapter.name||'Chapter '+(position+1)),created:now});
@@ -717,8 +713,7 @@ export async function importBackup(file,options={}){
    const bytes=sources.reduce((sum,source)=>sum+(Number(source.size)||0),0);
    const totalBackupNovels=Number(options.prepared?.novelRecords?.length)||Number(stats.books)||0,importedNovelCount=Number(stats.books)||0,customImport=Boolean(options.prepared&&Array.isArray(options.selectedEntryNames)&&options.selectedEntryNames.length<totalBackupNovels),sourceName=isFolder?(folderName||'Extracted LN Reader folder'):names.length===1?names[0]:names.slice(0,3).join(', ')+(names.length>3?' +'+(names.length-3)+' more':''),report={id:'lnr-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),importedAt:Date.now(),selectedNovels:importedNovelCount,totalBackupNovels,customImport,originalName:sourceName,name:customImport?'Custom backup import · '+sourceName:sourceName,files:names.slice(0,100),format:isFolder?'Extracted folder':sources.some(source=>/\.zip$/i.test(source.name||''))?'ZIP archive':'JSON backup',sizeBytes:bytes,novels:importedNovelCount,chapters:Number(stats.chapters)||0,readableChapters:Number(stats.readable)||0,categories:restored.importCategories||[],settingsFiles:options.prepared?.settingsFiles||[]};
    history.unshift(report);localStorage.setItem(historyKey,JSON.stringify(history));
-  }
-  if(restored.source==='lnreader-json'){
+  }  if(restored.source==='lnreader-json'){
    toast('LNReader 1.x · '+restored.items.length+' novels imported; chapter files and reading progress are not in this backup');
   }else if(restored.source==='lnreader-zip'){
    const stats=restored.stats||{books:restored.items.length,chapters:0,readable:0};
