@@ -71,7 +71,7 @@ export function initImageTools() {
     const label = textInput.value.trim();
     if (label) {
       const size = Math.max(10, Math.min(240, Number(textSize.value) || 36)) * (width / Math.max(1, base.width));
-      context.font = '700 ' + Math.max(10, size) + 'px Manrope, sans-serif';
+      context.font = '700 ' + Math.max(10, size) + 'px system-ui, sans-serif';
       context.textAlign = 'center';
       context.textBaseline = 'middle';
       const y = textPosition.value === 'top' ? size * 1.5 : textPosition.value === 'center' ? height / 2 : height - size * 1.5;
