@@ -52,17 +52,25 @@
  <div class="image-tools-layout">
   <section class="image-tools-preview-column">
    <div class="image-tool-preview-card">
-    <div class="image-tool-preview-top"><div><b>Preview</b><span id="imageToolDimensions" class="muted tiny">No image selected</span></div><span class="image-tool-local-indicator"><span></span> Processed locally</span></div>
+    <div class="image-tool-preview-top"><div><b>Original image</b><span id="imageToolDimensions" class="muted tiny">No image selected</span></div><span class="image-tool-local-indicator"><span></span> Original · unchanged</span></div>
     <div id="imageToolDropzone" class="image-tool-dropzone">
      <div id="imageToolPreviewEmpty" class="image-tool-empty"><span class="image-tool-empty-icon">▧</span><b>Choose or drop an image</b><span class="muted tiny">You can also paste an image from your clipboard.</span><button type="button" id="imageToolEmptyChoose">Choose image</button></div>
-     <canvas id="imageToolCanvas" class="hidden" aria-label="Image editing preview"></canvas>
+     <canvas id="imageToolCanvas" class="hidden" aria-label="Original image and crop selection"></canvas>
+    </div>
+    <div class="image-tool-original-meta"><span>Original file size</span><b id="imageToolOriginalSize">—</b></div>
+   </div>
+   <div class="image-tool-output-card">
+    <div class="image-tool-preview-top"><div><b>Processed output</b><span id="imageToolOutputDimensions" class="muted tiny">Your edited image appears here</span></div><span class="image-tool-local-indicator"><span></span> Live preview</span></div>
+    <div class="image-tool-output-stage">
+     <div id="imageToolOutputEmpty" class="image-tool-empty"><span class="image-tool-empty-icon">✧</span><b>Output preview</b><span class="muted tiny">Choose an image and the processed result will appear here.</span></div>
+     <img id="imageToolOutputPreview" class="hidden" alt="Processed image output">
     </div>
     <div class="image-tool-size-summary">
-     <div><span class="muted tiny">Original</span><b id="imageToolOriginalSize">—</b></div><div><span class="muted tiny">Estimated output</span><b id="imageToolOutputSize">—</b></div><div><span class="muted tiny">Difference</span><b id="imageToolSavings">—</b></div>
+     <div><span class="muted tiny">Original</span><b id="imageToolOriginalSizeMirror">—</b></div><div><span class="muted tiny">Output size</span><b id="imageToolOutputSize">—</b></div><div><span class="muted tiny">Difference</span><b id="imageToolSavings">—</b></div>
     </div>
+    <div class="image-tool-output-actions"><button type="button" id="imageToolCopy" class="primary" disabled>▣ Copy output image</button><button type="button" id="imageToolDownload" disabled>↓ Download output</button><button type="button" id="imageToolReset" disabled>Reset edits</button></div>
     <p id="imageToolStatus" class="image-tool-status" aria-live="polite">Choose an image to begin. Nothing is uploaded.</p>
    </div>
-   <div class="image-tool-export-row"><button type="button" id="imageToolCopy" class="primary" disabled>▣ Copy image</button><button type="button" id="imageToolDownload" disabled>↓ Download image</button><button type="button" id="imageToolReset" disabled>Reset edits</button></div>
   </section>
   <aside class="image-tools-controls">
    <section class="image-tool-control-card"><div class="image-tool-section-title"><b>Compression</b><span class="muted tiny">Output quality</span></div>
@@ -84,7 +92,7 @@
    <section class="image-tool-control-card"><div class="image-tool-section-title"><b>Add text</b><span class="muted tiny">Overlay on image</span></div>
     <label class="image-tool-field">Text<input id="imageToolText" type="text" maxlength="160" placeholder="Type text to add"></label>
     <div class="image-tool-text-options"><label>Size<input id="imageToolTextSize" type="number" min="10" max="240" value="36"></label><label>Color<input id="imageToolTextColor" type="color" value="#ffffff"></label></div>
-    <label class="image-tool-field">Position<select id="imageToolTextPosition"><option value="bottom">Bottom</option><option value="center">Center</option><option value="top">Top</option></select></label>
+    <label class="image-tool-field">Position<select id="imageToolTextPosition"><option value="left-top">Top left</option><option value="center-top">Top centre</option><option value="right-top">Top right</option><option value="left-center">Middle left</option><option value="center-center" selected>Centre</option><option value="right-center">Middle right</option><option value="left-bottom">Bottom left</option><option value="center-bottom">Bottom centre</option><option value="right-bottom">Bottom right</option></select></label>
    </section>
   </aside>
  </div>
