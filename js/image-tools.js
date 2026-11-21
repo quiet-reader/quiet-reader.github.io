@@ -1,4 +1,5 @@
 import {confirmImagePreview} from './image-preview.js';
+import {initImageBatchTools} from './image-batch-tools.js';
 
 const $ = id => document.getElementById(id);
 
@@ -38,6 +39,7 @@ export function initImageTools() {
   let previewTimer = 0, renderGeneration = 0, aspectRatio = 1;
 
   $('imageToolReset').disabled = true;
+  window.addEventListener('image-batch-single', event => loadFile(event.detail));
   const formatBytes = bytes => {
     if (!Number.isFinite(bytes)) return '—';
     if (bytes < 1024) return bytes + ' B';
@@ -311,12 +313,16 @@ export function initImageTools() {
     try {
       if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Image clipboard writing is not supported in this browser. Use Download image instead.');
       let clipboardBlob = outputBlob;
+      let clipboardNote = '';
       if (typeof ClipboardItem.supports === 'function' && !ClipboardItem.supports(outputBlob.type)) {
+        // Clipboard image formats are browser/OS constrained (commonly PNG only).
+        // Re-encode the already processed canvas, never the original source image.
         clipboardBlob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/png'));
+        clipboardNote = ' (clipboard format PNG; processed dimensions and edits retained)';
       }
       if (!clipboardBlob) throw new Error('This browser could not prepare a clipboard-compatible image. Use Download image instead.');
       await navigator.clipboard.write([new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })]);
-      setStatus('Processed output image copied to clipboard.');
+      setStatus('Processed output image copied to clipboard' + clipboardNote + '.');
     } catch (error) { setStatus(error.message || 'Could not copy image to clipboard.'); }
   });
   downloadButton.addEventListener('click', () => {
@@ -343,6 +349,7 @@ export function initImageTools() {
     schedulePreview();
     cropHint.textContent = 'Choose Crop, then drag over the original image to select the area to keep.';
   });
+  initImageBatchTools();
   screen.addEventListener('paste', async event => {
     const file = [...(event.clipboardData?.items || [])].find(item => item.type.startsWith('image/'))?.getAsFile();
     if (file) { event.preventDefault(); await previewClipboardFile(file); }
