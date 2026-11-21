@@ -1,4 +1,4 @@
-import {$,esc,toast,modal,closeModal,dataURL} from './utils.js';import {state,setScreen} from './state.js';import {refresh,drawBook,drawLibrary,openBook,createNovel,handleLibraryClick,savePasteAsBook,savePasteOnly,setBookTab,saveBookNotes,setLibraryView,setLibrarySearch,showChapterHistory,handleCollectionAction} from './library.js';import {editChapter,saveChapter,deleteChapter,insertImage,importTextBook,importTextChapters} from './editor.js';import {openReader,drawReader,saveProgress,changeChapter,jumpChapter,addBookmark,renderChapterFormat,copySection,copyChapter,toggleSection,startAutoRead,pauseAutoRead,stopAutoRead,setAutoReadPosition,isAutoReadSpeaking,isAutoReadActive,setAutoReadSpeed,setTTSSpeechSpeed,searchNovel,showMoreNovelSearchResults,openNovelSearchResult,initTTS,setTTSEnabled,setTTSVoice,setTTSEngine} from './reader.js';import {addHighlight,addParagraphHighlight,showMarks,positionSelectionToolbar,hideSelectionToolbar,bookmarkFromSelection} from './highlights.js';import {applyTheme,applyAccent,applyBackground,applyTextColor,applyHoverColor,applyFaviconMode,initTheme} from './themes.js';import {exportBackup,importBackup,importZipCollection} from './backup.js';import {importEPUB,exportEPUB} from './epub.js';import {importPDF} from './pdf.js';import {put} from './db.js';import {manageNovelLinks,manageChapterLinks,renderReaderLinks,openLinkedChapter} from './links.js';import {manageTranslationSources,openTranslatePage,restoreOriginalChapter,copyTranslatedChapter,syncTranslationControls} from './translation.js';import {renameChapters} from './chapter-tools.js';import {showUniversalHistory} from './history.js';import {createGallery,addGalleryImages,addGalleryFolder,importGalleryFiles,renderGallery,continueGallery,pasteGalleryImages} from './galleries.js';import {pasteEditorImage} from './editor.js';import {addEditEvent} from './history.js';import {confirmImagePreview} from './image-preview.js';
+import {$,esc,toast,modal,closeModal,dataURL} from './utils.js';import {state,setScreen} from './state.js';import {refresh,drawBook,drawLibrary,openBook,createNovel,handleLibraryClick,savePasteAsBook,savePasteOnly,setBookTab,saveBookNotes,setLibraryView,setLibrarySearch,showChapterHistory,handleCollectionAction} from './library.js';import {editChapter,saveChapter,deleteChapter,insertImage,importTextBook,importTextChapters} from './editor.js';import {openReader,drawReader,saveProgress,changeChapter,jumpChapter,addBookmark,renderChapterFormat,copySection,copyChapter,toggleSection,startAutoRead,pauseAutoRead,stopAutoRead,setAutoReadPosition,isAutoReadSpeaking,isAutoReadActive,setAutoReadSpeed,setTTSSpeechSpeed,searchNovel,showMoreNovelSearchResults,openNovelSearchResult,initTTS,setTTSEnabled,setTTSVoice,setTTSEngine} from './reader.js';import {addHighlight,addParagraphHighlight,showMarks,positionSelectionToolbar,hideSelectionToolbar,bookmarkFromSelection} from './highlights.js';import {applyTheme,applyAccent,applyBackground,applyTextColor,applyHoverColor,applyFaviconMode,initTheme} from './themes.js';import {exportBackup,importBackup,importZipCollection} from './backup.js';import {importEPUB,exportEPUB} from './epub.js';import {importPDF} from './pdf.js';import {put} from './db.js';import {manageNovelLinks,manageChapterLinks,renderReaderLinks,openLinkedChapter} from './links.js';import {manageTranslationSources,openTranslatePage,restoreOriginalChapter,copyTranslatedChapter,syncTranslationControls} from './translation.js';import {renameChapters} from './chapter-tools.js';import {showUniversalHistory} from './history.js';import {createGallery,addGalleryImages,addGalleryFolder,importGalleryFiles,renderGallery,continueGallery,pasteGalleryImages} from './galleries.js';import {pasteEditorImage} from './editor.js';import {addEditEvent} from './history.js';import {confirmImagePreview} from './image-preview.js';import {initImageTools} from './image-tools.js';
 function enhanceSelects(root=document){
  root.querySelectorAll?.('select').forEach(select=>{
   if(select.dataset.customized==='1')return;select.dataset.customized='1';
@@ -302,10 +302,10 @@ setScreen('library');
 
 // Top-level Library / Galleries navigation and user-defined library categories.
 function syncHeaderActions(section){
- const gallery=section==='gallery',collections=section==='collections';
+ const gallery=section==='gallery',collections=section==='collections',tools=section==='tools';
  $('galleryHeaderActions')?.classList.toggle('hidden',!gallery);
  $('collectionHeaderActions')?.classList.toggle('hidden',!collections);
- $('libraryHeaderActions')?.classList.toggle('hidden',gallery||collections);
+ $('libraryHeaderActions')?.classList.toggle('hidden',gallery||collections||tools);
  document.querySelectorAll('[data-main-section]').forEach(button=>{
   const active=button.dataset.mainSection===section;
   button.classList.toggle('active',active);
@@ -314,8 +314,10 @@ function syncHeaderActions(section){
 }
 function setMainSection(section){
  const gallery=section==='gallery';
+ if(section==='tools'){state.collectionId=null;syncHeaderActions('tools');setScreen('tools');return}
  state.filter=section==='collections'?'collections':gallery?'gallery':'all';
  state.collectionId=null;
+ setScreen('library');
  syncHeaderActions(section);
  document.querySelectorAll('[data-filter]').forEach(button=>button.classList.toggle('active',button.dataset.filter===state.filter));
  drawLibrary();
@@ -393,3 +395,5 @@ document.querySelectorAll('[data-category-filter]').forEach(button=>{
   document.querySelectorAll('[data-main-section]').forEach(nav=>nav.classList.toggle('active',nav.dataset.mainSection==='library'));
  });
 });
+
+initImageTools();
