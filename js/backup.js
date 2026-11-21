@@ -177,8 +177,7 @@ async function readZipArchive(file){
   if(Array.isArray(value)){for(let i=0;i<value.length;i++)value[i]=await hydrate(value[i]);return value}
   if(value&&typeof value==='object'){for(const key of Object.keys(value))value[key]=await hydrate(value[key]);return value}
   return value;
- };
- const restored=[];
+ }; const restored=[];
  for(const ref of library.books){const item=await readItem(ref);if(item.kind!=='book'||item.id!==ref.id)throw new Error('A book entry does not match its library index.');restored.push(await hydrate(item))}
  for(const ref of library.pastes){const item=await readItem(ref);if(item.kind!=='paste'||item.id!==ref.id)throw new Error('A paste entry does not match its library index.');restored.push(item)}
  return {items:restored,theme:library.theme,preferences:library.preferences};
@@ -189,7 +188,23 @@ const zipPathIndexCache=new WeakMap();
 const chapterFolderCache=new WeakMap();
 function zipFiles(zip){if(!zip||typeof zip!=='object')return [];let files=zipFileCache.get(zip);if(!files){files=Object.values(zip.files||{}).filter(entry=>!entry.dir);zipFileCache.set(zip,files)}return files}
 function zipPathIndex(zip){let index=zipPathIndexCache.get(zip);if(index)return index;const byPath=new Map(),bySegment=new Map();for(const entry of zipFiles(zip))byPath.set(normalizedZipPath(entry.name),entry);index={byPath,bySegment};zipPathIndexCache.set(zip,index);return index}
-function primeZipPathIndex(zip,novelRecords){const wanted=new Set();for(const record of novelRecords){const novel=record.novel||{},novelId=String(novel.id??novel.novelId??'').toLowerCase();if(novelId)wanted.add(novelId);for(const chapter of normalizeChapterList(novel.chapters)){for(const value of [chapter.id,chapter.chapterId,chapter.chapterNumber,chapter.position])if(value!==undefined&&value!==null)wanted.add(String(value).toLowerCase())}}const byPath=new Map(),bySegment=new Map();for(const entry of zipFiles(zip)){const path=normalizedZipPath(entry.name);byPath.set(path,entry);for(const part of new Set(pathParts(path)))if(wanted.has(part)){if(!bySegment.has(part))bySegment.set(part,[]);bySegment.get(part).push(entry)}}zipPathIndexCache.set(zip,{byPath,bySegment})}
+function primeZipPathIndex(zip,novelRecords){
+ const wanted=new Set();
+ for(const record of novelRecords){
+  const novel=record.novel||{},novelId=String(novel.id??novel.novelId??'').toLowerCase();
+  if(novelId)wanted.add(novelId);
+  for(const chapter of normalizeChapterList(novel.chapters))for(const value of [chapter.id,chapter.chapterId,chapter.chapterNumber,chapter.position])if(value!==undefined&&value!==null)wanted.add(String(value).toLowerCase());
+ }
+ const byPath=new Map(),bySegment=new Map();
+ // Traverse the directory once, but retain paths only for selected novel/chapter IDs.
+ for(const entry of zipFiles(zip)){
+  const path=normalizedZipPath(entry.name),parts=new Set(pathParts(path));
+  if(![...parts].some(part=>wanted.has(part)))continue;
+  byPath.set(path,entry);
+  for(const part of parts){if(!bySegment.has(part))bySegment.set(part,[]);bySegment.get(part).push(entry)}
+ }
+ zipPathIndexCache.set(zip,{byPath,bySegment});
+}
 function findZipEntry(zip,predicate){return zipFiles(zip).find(entry=>predicate(entry.name.split(String.fromCharCode(92)).join('/')))}
 function zipImagesInFolder(zip,folder){const key=normalizedZipPath(folder),segment=pathParts(key).at(-1)||'',prefix=key?key+'/':'';return (zipPathIndex(zip).bySegment.get(segment)||[]).filter(entry=>{const path=normalizedZipPath(entry.name);return path.startsWith(prefix)&&/\.(png|jpe?g|webp|gif|avif|bmp)$/i.test(path)}).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}))}
 function guessMime(name){
@@ -337,131 +352,98 @@ function fallbackNovelRecords(archive){
  if(!groups.size){for(const entry of zipFiles(archive)){const parts=pathParts(entry.name),base=parts.at(-1)||'';let plugin='local',novelId='',chapterId='',chapterPath='';if(/index\.html?$/i.test(base)&&parts.length>=3){chapterId=parts.at(-2);novelId=parts.at(-3);plugin=parts.length>=4?parts.at(-4):'local';chapterPath=chapterId}else if(/^(?:chapter[-_ ]*)?\d+\.json$/i.test(base)&&parts.length>=3){chapterId=base.replace(/\.json$/i,'');novelId=parts.at(-2);plugin=parts.length>=3?parts.at(-3):'local';chapterPath=chapterId}else continue;if(!groups.has(novelId)){const readableName=/^\d+$/.test(novelId)?'LN Reader novel '+novelId:novelId.replace(/[_-]+/g,' ').trim();groups.set(novelId,{id:novelId,pluginId:plugin,name:readableName||'LN Reader novel '+novelId,sourceFolder:parts.slice(0,-2).join('/'),chapters:new Map()});}const group=groups.get(novelId);if(!group.chapters.has(chapterId))group.chapters.set(chapterId,{id:chapterId,chapterNumber:chapterId,name:'Chapter '+chapterId,path:chapterPath})}}
  return [...groups.values()].map(group=>({entry:{name:'fallback/'+group.pluginId+'/NovelAndChapters/'+group.id+'.json'},novel:{id:group.id,pluginId:group.pluginId,name:group.name,chapters:[...group.chapters.values()].sort((a,b)=>String(a.chapterNumber).localeCompare(String(b.chapterNumber),undefined,{numeric:true}))}})).filter(record=>record.novel.chapters.length);
 }
+async function loadLNReaderContentSource(source){
+ if(source.archive)return source.archive;
+ if(source.file)return JSZip.loadAsync(source.file);
+ if(source.entry)return JSZip.loadAsync(await source.entry.async('uint8array'));
+ return null;
+}
+async function loadLNReaderContentArchives(prepared){
+ const loaded=[...(prepared?.contentArchives||[])];
+ for(const source of prepared?.contentSources||[]){
+  try{
+   const archive=await loadLNReaderContentSource(source);
+   if(archive&&!loaded.includes(archive))loaded.push(archive);
+  }catch(error){console.warn('LNReader content archive could not be opened',source.label||source.entry?.name||source.file?.name,error)}
+ }
+ return loaded;
+}
 async function inspectLNReaderSources(source){
  if(!window.JSZip)throw new Error('The ZIP library did not load. Check your connection and retry.');
  const sources=Array.isArray(source)?source:[source],zipInputs=sources.filter(file=>!file.webkitRelativePath&&(/\.zip$/i.test(file.name||'')||/zip/i.test(file.type||''))),folderInputs=sources.filter(file=>file.webkitRelativePath);
- const archives=[];
+ const archives=[],contentSources=[];
  if(folderInputs.length)archives.push({archive:makeFolderArchive(folderInputs),label:'Extracted folder',folder:true});
- for(const file of zipInputs)archives.push({archive:await JSZip.loadAsync(file),label:file.name||'ZIP',file});
- if(!archives.length)throw new Error('Choose one or more ZIP files or an extracted LN Reader folder.');
-
- // Discover every named nested archive before choosing sources. In particular,
- // novel-files.zip is a content archive, never a substitute for data.zip metadata.
- const extraArchives=[],nestedByName=new Map();
+ for(const file of zipInputs){
+  const base=String(file.name||'').toLowerCase();
+  if(['download.zip','novel-files.zip'].includes(base)){contentSources.push({file,label:base});continue}
+  archives.push({archive:await JSZip.loadAsync(file),label:base||'zip',file});
+ }
+ if(!archives.length&&!contentSources.length)throw new Error('Choose one or more ZIP files or an extracted LN Reader folder.');
+ const metadataArchives=[];
  for(const item of archives){
   for(const entry of zipFiles(item.archive)){
    const base=(pathParts(entry.name).at(-1)||'').toLowerCase();
-   if(!/\.zip$/i.test(base))continue;
-   if(!['data.zip','download.zip','novel-files.zip'].includes(base))continue;
-   try{
-    const nested=await JSZip.loadAsync(await entry.async('uint8array'));
-    extraArchives.push(nested);
-    if(!nestedByName.has(base))nestedByName.set(base,[]);
-    nestedByName.get(base).push(nested);
-   }catch(error){console.warn('LNReader nested archive could not be opened',entry.name,error)}
+   if(base==='data.zip'){
+    try{metadataArchives.push({archive:await JSZip.loadAsync(await entry.async('uint8array')),label:'data.zip'})}
+    catch(error){console.warn('LNReader metadata archive could not be opened',entry.name,error)}
+   }else if(base==='download.zip'||base==='novel-files.zip')contentSources.push({entry,parent:item.archive,label:base});
   }
  }
-
- const allCandidates=[
-  ...archives.map(item=>({archive:item.archive,label:String(item.label||'').toLowerCase(),folder:Boolean(item.folder)})),
-  ...extraArchives.map(archive=>({archive,label:'nested',folder:false}))
- ];
- const metadataCandidates=allCandidates.filter(item=>archiveHasNovelMetadata(item.archive));
- // Prefer a real data.zip containing NovelAndChapters, then any archive that
- // actually contains that directory. Never select novel-files.zip by filename alone.
- const dataZip=
-  allCandidates.find(item=>item.label==='data.zip'&&archiveHasNovelMetadata(item.archive))?.archive||
+ const candidates=[...archives.map(item=>({archive:item.archive,label:item.label,folder:Boolean(item.folder)})),...metadataArchives.map(item=>({archive:item.archive,label:item.label,folder:false}))];
+ const metadataCandidates=candidates.filter(item=>archiveHasNovelMetadata(item.archive));
+ let dataZip=candidates.find(item=>item.label==='data.zip'&&archiveHasNovelMetadata(item.archive))?.archive||
   metadataCandidates.find(item=>item.label!=='novel-files.zip')?.archive||
   metadataCandidates[0]?.archive||
-  allCandidates.find(item=>item.folder)?.archive||
-  null;
+  candidates.find(item=>item.folder)?.archive||null;
+ let contentArchives=archives.filter(item=>item.folder||
+  !zipFiles(item.archive).some(entry=>['data.zip','download.zip','novel-files.zip'].includes((pathParts(entry.name).at(-1)||'').toLowerCase()))).map(item=>item.archive);
+ let legacyArchive=null;
+ if(!dataZip||!archiveHasNovelMetadata(dataZip)){
+  const legacyLoaded=[...contentArchives];
+  for(const descriptor of contentSources){
+   try{const archive=await loadLNReaderContentSource(descriptor);if(archive&&!legacyLoaded.includes(archive))legacyLoaded.push(archive)}
+   catch(error){console.warn('LNReader legacy archive could not be opened',descriptor.label,error)}
+  }
+  legacyArchive=legacyLoaded.reduce((merged,archive)=>combineArchiveViews(merged,archive),null);
+  if(!dataZip)dataZip=legacyLoaded.find(archive=>archiveHasNovelMetadata(archive))||archives.find(item=>item.folder)?.archive||null;
+ }
  if(!dataZip)throw new Error('No data.zip or NovelAndChapters metadata was found in the selected sources.');
-
- // Keep the legacy Titan download.zip as the preferred downloaded-content source.
- // novel-files.zip is supported as an additional/alternate content archive.
- const namedDownload=allCandidates.find(item=>item.label==='download.zip')?.archive||
-  nestedByName.get('download.zip')?.[0]||null;
- const namedNovelFiles=allCandidates.find(item=>item.label==='novel-files.zip')?.archive||
-  nestedByName.get('novel-files.zip')?.[0]||null;
- let downloadZip=namedDownload||namedNovelFiles||
-  allCandidates.find(item=>zipFiles(item.archive).some(entry=>/\.(html?|png|jpe?g|webp|gif|avif|bmp)$/i.test(entry.name)))?.archive||
-  dataZip;
-
- // Archives that are merely wrappers around named ZIPs are not chapter payloads.
- // Keep ordinary top-level archives and all extracted nested content archives.
- const contentArchives=archives.filter(item=>item.folder||
-  !zipFiles(item.archive).some(entry=>['data.zip','download.zip','novel-files.zip'].includes((pathParts(entry.name).at(-1)||'').toLowerCase())))
-  .map(item=>item.archive);
- const chapterSources=[...contentArchives,...extraArchives,namedDownload,namedNovelFiles,downloadZip]
-  .filter((archive,index,list)=>archive&&list.indexOf(archive)===index);
- // Metadata is merged last so duplicate paths in a downloaded-content archive
- // cannot shadow the authoritative NovelAndChapters JSON files.
- const chapterArchive=[...chapterSources.filter(archive=>archive!==dataZip),dataZip]
-  .reduce((merged,archive)=>combineArchiveViews(merged,archive),null);
-
- // Lock novel discovery to the selected metadata archive. Downloaded content is
- // indexed separately and must never determine whether novel detail JSON exists.
  const dataFiles=zipFiles(dataZip);
  const novelEntries=dataFiles.filter(entry=>normalizedZipPath(entry.name).includes('novelandchapters/')&&/\.json$/i.test(entry.name));
  const novelRecords=[];
  for(const entry of novelEntries){
-  try{
-   const novel=JSON.parse(await entry.async('string'));
-   if(novel&&typeof novel==='object'&&novel.chapters!==undefined)
-    novelRecords.push({entry,novel:{...novel,chapters:normalizeChapterList(novel.chapters)}});
-  }catch(error){console.warn('LNReader novel metadata JSON could not be parsed',entry.name,error)}
+  try{const novel=JSON.parse(await entry.async('string'));if(novel&&typeof novel==='object'&&novel.chapters!==undefined)novelRecords.push({entry,novel:{...novel,chapters:normalizeChapterList(novel.chapters)}})}
+  catch(error){console.warn('LNReader novel metadata JSON could not be parsed',entry.name,error)}
  }
- // Retain legacy JSON discovery only when no canonical NovelAndChapters files
- // exist at all. A content archive must not replace valid metadata discovery.
  if(!novelEntries.length&&!novelRecords.length){
-  const novelSourceFiles=zipFiles(chapterArchive);
+  const legacySource=legacyArchive||dataZip,novelSourceFiles=zipFiles(legacySource);
   for(const entry of novelSourceFiles.filter(entry=>/\.json$/i.test(entry.name)&&/(novels?|novel-files)/i.test(entry.name))){
-   try{
-    const novel=JSON.parse(await entry.async('string'));
-    if(novel&&typeof novel==='object'&&novel.chapters!==undefined)
-     novelRecords.push({entry,novel:{...novel,chapters:normalizeChapterList(novel.chapters)}});
-   }catch{}
+   try{const novel=JSON.parse(await entry.async('string'));if(novel&&typeof novel==='object'&&novel.chapters!==undefined)novelRecords.push({entry,novel:{...novel,chapters:normalizeChapterList(novel.chapters)}})}catch{}
   }
-  if(!novelRecords.length){
-   for(const entry of novelSourceFiles.filter(entry=>/\.json$/i.test(entry.name))){
-    try{
-     const value=JSON.parse(await entry.async('string'));
-     const list=[value?.novels,value?.library?.novels,value?.data?.novels,value?.backup?.novels].find(Array.isArray);
-     if(list)for(const novel of list)if(novel&&typeof novel==='object'&&novel.chapters!==undefined)
-      novelRecords.push({entry,novel:{...novel,chapters:normalizeChapterList(novel.chapters)}});
-    }catch{}
-   }
+  if(!novelRecords.length)for(const entry of novelSourceFiles.filter(entry=>/\.json$/i.test(entry.name))){
+   try{const value=JSON.parse(await entry.async('string')),list=[value?.novels,value?.library?.novels,value?.data?.novels,value?.backup?.novels].find(Array.isArray);if(list)for(const novel of list)if(novel&&typeof novel==='object'&&novel.chapters!==undefined)novelRecords.push({entry,novel:{...novel,chapters:normalizeChapterList(novel.chapters)}})}catch{}
   }
  }
-
- // Folder reconstruction is a last-resort path only when canonical metadata
- // was not present. It must not replace or dilute a successfully discovered library.
  let fallback=false;
  if(!novelEntries.length&&!novelRecords.length){
-  let generated=fallbackNovelRecords(chapterArchive);
-  if(!generated.length&&chapterArchive!==dataZip)generated=fallbackNovelRecords(dataZip);
+  let generated=fallbackNovelRecords(legacyArchive||dataZip);
+  if(!generated.length&&legacyArchive&&legacyArchive!==dataZip)generated=fallbackNovelRecords(dataZip);
   for(const record of generated){novelRecords.push(record);fallback=true}
  }
-
- const categoryEntry=findZipEntry(dataZip,name=>pathParts(name).at(-1)==='category.json')||
-  [...archives.map(item=>item.archive),...extraArchives].map(archive=>findZipEntry(archive,name=>pathParts(name).at(-1)==='category.json')).find(Boolean);
+ const categoryEntry=findZipEntry(dataZip,name=>pathParts(name).at(-1)==='category.json');
  let categories=[];
  if(categoryEntry){try{const parsed=JSON.parse(await categoryEntry.async('string'));categories=Array.isArray(parsed)?parsed:Array.isArray(parsed?.categories)?parsed.categories:[]}catch{}}
  const chapters=novelRecords.reduce((sum,record)=>sum+record.novel.chapters.length,0),missing=[];
- if(!novelRecords.length)missing.push(novelEntries.length?
-  'NovelAndChapters JSON files were found, but none contained readable novel detail records; check their JSON structure and parsing errors':
-  'No novel detail JSON or recognizable numbered chapter folders were found; no novels can be safely created');
+ if(!novelRecords.length)missing.push(novelEntries.length?'NovelAndChapters JSON files were found, but none contained readable novel detail records; check their JSON structure and parsing errors':'No novel detail JSON or recognizable numbered chapter folders were found; no novels can be safely created');
  if(categoryEntry&&!categories.length)missing.push('category.json exists but is empty or could not be parsed; no category subcategories will be created');
  if(fallback){const rebuilt=novelRecords.filter(record=>String(record.entry?.name||'').startsWith('fallback/'));missing.push('Novel detail JSON is missing for '+rebuilt.length+' novel entr'+(rebuilt.length===1?'y':'ies')+'; titles and chapter order are reconstructed from the folder names and chapter indexes'+(rebuilt.length?' · source folders: '+rebuilt.map(record=>record.novel?.sourceFolder||record.entry?.name).filter(Boolean).slice(0,12).join(', '):''))}
  if(!categoryEntry)missing.push('category.json (LN Reader category subcategories will not be created)');
- const payloadCount=zipFiles(chapterArchive).filter(entry=>/\.(html?|png|jpe?g|webp|gif|avif|bmp)$/i.test(entry.name)||(/\.json$/i.test(entry.name)&&!normalizedZipPath(entry.name).includes('novelandchapters/')&&!/category\.json$/i.test(entry.name))).length;
- if(!payloadCount)missing.push('No downloaded chapter HTML, JSON, or image payloads were detected; chapter text may be unavailable');
- const metadataEntries=[...archives.flatMap(item=>zipFiles(item.archive)),...extraArchives.flatMap(archive=>zipFiles(archive)),...dataFiles,...zipFiles(downloadZip)].filter(entry=>/\.json$/i.test(entry.name)&&/(app|preference|setting|plugin|version|config|category|metadata)/i.test(entry.name));
+ const metadataArchives=[...archives.map(item=>item.archive),dataZip].filter((archive,index,list)=>archive&&list.indexOf(archive)===index);
+ const metadataEntries=metadataArchives.flatMap(archive=>zipFiles(archive)).filter(entry=>/\.json$/i.test(entry.name)&&/(app|preference|setting|plugin|version|config|category|metadata)/i.test(entry.name));
  const settingsFiles=[];
- for(const entry of metadataEntries){try{const value=JSON.parse(await entry.async('string'));const keys=value&&typeof value==='object'&&!Array.isArray(value)?Object.keys(value).slice(0,24):Array.isArray(value)?['Array · '+value.length+' items']:[typeof value];settingsFiles.push(entry.name+(entry.name.toLowerCase().includes('version')&&value&&typeof value==='object'?' · '+String(value.versionName||value.version||value.appVersion||value.name||'version field unavailable')+(value.versionCode?' · code '+value.versionCode:''):'')+(keys.length?' · '+keys.join(', '):' · empty JSON'))}catch{settingsFiles.push(entry.name+' · invalid JSON')}}
- const uniqueArchives=[...new Set([...archives.map(item=>item.archive),...extraArchives,dataZip,downloadZip].filter(Boolean))];
- const size=sources.reduce((sum,file)=>sum+(Number(file.size)||0),0),expandedSize=Math.max(size,uniqueArchives.reduce((sum,archive)=>sum+estimateExpandedSize(archive),0)),folderCount=uniqueArchives.reduce((sum,archive)=>sum+countArchiveFolders(archive),0);
- return {dataZip,downloadZip,chapterArchive,novelEntries,novelRecords,categories,categoryEntry,settingsFiles:[...new Set(settingsFiles)],jsonCount:uniqueArchives.reduce((sum,archive)=>sum+zipFiles(archive).filter(entry=>/\.json$/i.test(entry.name)).length,0),chapters,outerCount:archives.reduce((sum,item)=>sum+zipFiles(item.archive).length,0)+extraArchives.reduce((sum,archive)=>sum+zipFiles(archive).length,0),folderCount,dataCount:dataFiles.length,downloadCount:zipFiles(chapterArchive).length,missing,fallback,size,expandedSize,sourceLabel:sources.length===1?(folderInputs.length?'Extracted folder':sources[0].name||'LN Reader backup'):sources.length+' selected files'};
+ for(const entry of metadataEntries){try{const value=JSON.parse(await entry.async('string')),keys=value&&typeof value==='object'&&!Array.isArray(value)?Object.keys(value).slice(0,24):Array.isArray(value)?['Array · '+value.length+' items']:[typeof value];settingsFiles.push(entry.name+(entry.name.toLowerCase().includes('version')&&value&&typeof value==='object'?' · '+String(value.versionName||value.version||value.appVersion||value.name||'version field unavailable')+(value.versionCode?' · code '+value.versionCode:''):'')+(keys.length?' · '+keys.join(', '):' · empty JSON'))}catch{settingsFiles.push(entry.name+' · invalid JSON')}}
+ const size=sources.reduce((sum,file)=>sum+(Number(file.size)||0),0),outerCount=archives.reduce((sum,item)=>sum+zipFiles(item.archive).length,0);
+ return {dataZip,downloadZip:null,chapterArchive:null,contentArchives,contentSources,novelEntries,novelRecords,categories,categoryEntry,settingsFiles:[...new Set(settingsFiles)],jsonCount:dataFiles.filter(entry=>/\.json$/i.test(entry.name)).length,chapters,outerCount,dataCount:dataFiles.length,downloadCount:null,missing,fallback,size,expandedSize:null,folderCount:null,sourceLabel:sources.length===1?(folderInputs.length?'Extracted folder':sources[0].name||'LN Reader backup'):sources.length+' selected files'};
 }
 function countArchiveFolders(archive){const folders=new Set();for(const entry of zipFiles(archive)){const parts=pathParts(entry.name);for(let i=1;i<parts.length;i++)folders.add(parts.slice(0,i).join('/'))}return folders.size}
 function showLNReaderJsonPreflight(file,parsed,restored){
@@ -474,19 +456,16 @@ function showLNReaderJsonPreflight(file,parsed,restored){
 function showLNReaderPreflight(file,report,source=file){
  const categoryNames=report.categories.map(category=>String(category.name||'').trim()).filter(Boolean);
  const settings=report.settingsFiles.length?report.settingsFiles.map(name=>'<li>'+esc(name)+'</li>').join(''):'<li>No settings, plugin settings, or version JSON detected</li>';
- const missing=report.missing.length?'<ul class="muted tiny">'+report.missing.map(item=>'<li>'+esc(item)+'</li>').join('')+'</ul>':'<p class="muted tiny">No missing core files detected.</p>';
- const memoryNote=report.expandedSize>=536870912?'<p class="muted tiny">Large archive warning: expanded size is at least 512 MB. Selected novels are saved one at a time; multi-gigabyte imports still depend on browser memory and storage quota.</p>':'';
+ const missing=report.missing.length?'<ul class="muted tiny">'+report.missing.map(item=>'<li>'+esc(item)+'</li>').join('')+'</ul>':'<p class="muted tiny">No missing metadata files detected.</p>';
  const novelRows=report.novelRecords.map(record=>{
-  const novel=record.novel||{},entryName=String(record.entry?.name||''),id=String(novel.id??novel.novelId??pathParts(entryName).at(-1)?.replace(/\.json$/i,'')??'');
+  const novel=record.novel||{},entryName=String(record.entry?.name||'');
   const plugin=String(novel.pluginId||pathParts(entryName).find((part,index,parts)=>parts[index+1]?.toLowerCase()==='novelandchapters')||'local');
-  const chapters=normalizeChapterList(novel.chapters),downloaded=chapters.filter((chapter,index)=>Boolean(chapter.isDownloaded||chapter.downloaded)||Boolean(findDownloadedChapterJson(report.chapterArchive||report.downloadZip,plugin,id,chapter,index))||Boolean(chapterHtmlEntry(report.chapterArchive||report.downloadZip,plugin,id,chapter))).length;
-  const title=String(novel.name||novel.title||novel.sourceFolder||pathParts(entryName).at(-1)?.replace(/\.json$/i,'')||'Untitled novel');
-  return '<label class="lnreader-novel-choice"><input type="checkbox" data-ln-novel-entry="'+esc(entryName)+'"><span class="lnreader-novel-choice-copy"><b>'+esc(title)+'</b><small>'+esc(plugin)+' · '+chapters.length+' chapters · '+downloaded+' with downloaded content</small><small class="lnreader-novel-source">'+esc(entryName)+'</small></span></label>';
+  const chapters=normalizeChapterList(novel.chapters),title=String(novel.name||novel.title||novel.sourceFolder||pathParts(entryName).at(-1)?.replace(/\.json$/i,'')||'Untitled novel');
+  return '<label class="lnreader-novel-choice"><input type="checkbox" data-ln-novel-entry="'+esc(entryName)+'"><span class="lnreader-novel-choice-copy"><b>'+esc(title)+'</b><small>'+esc(plugin)+' · '+chapters.length+' chapters · content checked after selection</small><small class="lnreader-novel-source">'+esc(entryName)+'</small></span></label>';
  }).join('');
- const html='<div class="stack"><p class="muted tiny">The archive has been scanned. Choose which novels to add; nothing is imported until you confirm.</p><div class="modal-item"><b>Archive</b><p>'+esc(report.sourceLabel||file.name||'LN Reader backup')+' · '+readableSize(report.size)+' compressed · approx. '+readableSize(report.expandedSize)+' expanded</p><p>'+report.outerCount+' files · '+report.folderCount+' folders · '+report.jsonCount+' JSON files · '+report.dataCount+' data entries · '+report.downloadCount+' downloaded entries</p></div><div class="modal-item"><b>Detected content</b><p>'+report.novelRecords.length+' novels · '+report.chapters+' chapter records · '+report.categories.length+' categories</p><p>'+(categoryNames.length?categoryNames.map(esc).join(', '):'No categories found')+'</p></div><div class="modal-item"><b>Settings and app metadata</b><ul class="tiny">'+settings+'</ul></div><div class="modal-item"><b>Verification notes</b>'+missing+'</div>'+memoryNote+'<section class="lnreader-novel-picker"><div class="lnreader-novel-picker-head"><b>Select novels to import</b><span id="lnReaderSelectedCount" class="muted tiny">0 selected</span></div><input id="lnReaderNovelSearch" type="search" placeholder="Search novel title, source or plugin…" autocomplete="off"><div class="row wrap"><button type="button" id="lnReaderSelectAll">Select all shown</button><button type="button" id="lnReaderClearSelection">Clear selection</button></div><div id="lnReaderNovelChoices" class="lnreader-novel-choices">'+(novelRows||'<p class="muted tiny">No novels were detected.</p>')+'</div></section><p class="muted tiny">Downloaded-content counts are based on chapter metadata and matching chapter payload files. During import, each selected chapter is verified and only available chapter content is added. Novels with no downloaded chapters can still be imported as chapter-index entries.</p><div class="row"><span class="grow"></span><button type="button" id="cancelLNReaderPreflight">Cancel</button><button type="button" class="primary" id="confirmLNReaderPreflight" disabled>Import selected novels</button></div></div>';
+ const html='<div class="stack"><p class="muted tiny">Metadata discovery is complete. Content archives have not been opened or searched. Choose which novels to add; nothing is imported until you confirm.</p><div class="modal-item"><b>Selected source</b><p>'+esc(report.sourceLabel||file.name||'LN Reader backup')+' · '+readableSize(report.size)+' compressed</p><p>'+report.outerCount+' outer archive entries · '+report.dataCount+' metadata archive entries · '+report.jsonCount+' metadata JSON files</p></div><div class="modal-item"><b>Detected metadata</b><p>'+report.novelRecords.length+' novels · '+report.chapters+' chapter records · '+report.categories.length+' categories</p><p>'+(categoryNames.length?categoryNames.map(esc).join(', '):'No categories found')+'</p></div><div class="modal-item"><b>Settings and app metadata</b><ul class="tiny">'+settings+'</ul></div><div class="modal-item"><b>Metadata verification</b>'+missing+'</div><section class="lnreader-novel-picker"><div class="lnreader-novel-picker-head"><b>Select novels to import</b><span id="lnReaderSelectedCount" class="muted tiny">0 selected</span></div><input id="lnReaderNovelSearch" type="search" placeholder="Search novel title, source or plugin…" autocomplete="off"><div class="row wrap"><button type="button" id="lnReaderSelectAll">Select all shown</button><button type="button" id="lnReaderClearSelection">Clear selection</button></div><div id="lnReaderNovelChoices" class="lnreader-novel-choices">'+(novelRows||'<p class="muted tiny">No novels were detected.</p>')+'</div></section><p class="muted tiny">After confirmation, the importer opens the available content archives and checks chapter files for selected novels only. Missing files do not remove chapter metadata.</p><div class="row"><span class="grow"></span><button type="button" id="cancelLNReaderPreflight">Cancel</button><button type="button" class="primary" id="confirmLNReaderPreflight" disabled>Import selected novels</button></div></div>';
  modal('Review LN Reader backup',html,()=>{
-  const host=$('modalHost'),list=$('lnReaderNovelChoices'),search=$('lnReaderNovelSearch'),confirm=$('confirmLNReaderPreflight'),count=$('lnReaderSelectedCount');
-  const selected=new Set();
+  const list=$('lnReaderNovelChoices'),search=$('lnReaderNovelSearch'),confirm=$('confirmLNReaderPreflight'),count=$('lnReaderSelectedCount'),selected=new Set();
   const update=()=>{const checked=[...list.querySelectorAll('[data-ln-novel-entry]:checked')];selected.clear();checked.forEach(input=>selected.add(input.dataset.lnNovelEntry));count.textContent=selected.size+' selected';confirm.disabled=!selected.size;confirm.textContent=selected.size?'Import '+selected.size+' selected novel'+(selected.size===1?'':'s'):'Import selected novels'};
   const filter=()=>{const query=search.value.trim().toLocaleLowerCase();list.querySelectorAll('.lnreader-novel-choice').forEach(row=>row.classList.toggle('hidden',Boolean(query)&&!row.textContent.toLocaleLowerCase().includes(query)))};
   list.addEventListener('change',update);search.addEventListener('input',filter);
@@ -507,12 +486,15 @@ async function readLNReaderArchive(prepared,onBook,selectedEntryNames){
  const categoryRegistry=createLNReaderCategoryResolver();
  const categoryNames=new Map(categories.map(category=>[Number(category.id),categoryRegistry.name(category.name)]).filter(([,name])=>name));
  const importedCategories=new Set([...categoryNames.values()].filter(Boolean));
- const downloadZip=prepared?.chapterArchive||prepared?.downloadZip||dataZip;
  const novelRecords=prepared?.novelRecords||[];
- primeZipPathIndex(downloadZip,novelRecords);
  const selectedSet=Array.isArray(selectedEntryNames)?new Set(selectedEntryNames):null;
  const selectedRecords=(novelRecords.length?novelRecords:novelEntries.map(entry=>({entry,novel:null}))).filter(record=>!selectedSet||selectedSet.has(String(record.entry?.name||'')));
  if(selectedSet&&!selectedRecords.length)throw new Error('Select at least one novel to import.');
+ toast('Checking downloaded chapter files for selected novels…');
+ const contentArchives=await loadLNReaderContentArchives(prepared);
+ const chapterSources=[...contentArchives,dataZip].filter((archive,index,list)=>archive&&list.indexOf(archive)===index);
+ const downloadZip=chapterSources.reduce((merged,archive)=>combineArchiveViews(merged,archive),null)||dataZip;
+ primeZipPathIndex(downloadZip,selectedRecords);
  const items=[];let importedBooks=0,totalChapters=0,readableChapters=0;
  for(const record of selectedRecords){
   const entry=record.entry;let novel=record.novel;
@@ -537,9 +519,7 @@ async function readLNReaderArchive(prepared,onBook,selectedEntryNames){
   const novelDownloadFiles=downloadZip?(zipPathIndex(downloadZip).bySegment.get(id.toLowerCase())||[]).filter(item=>{
    const parts=pathParts(item.name),at=parts.indexOf(id.toLowerCase());
    return at>=0&&(!pluginId||parts.slice(0,at).includes(pluginId.toLowerCase())||parts.length-at>1);
-  }):[];
-  const cover=novelDownloadFiles.find(item=>/(^|\/)(cover|thumbnail)\.(png|jpe?g|webp|gif|avif)$/i.test(normalizedZipPath(item.name)))||
-   (downloadZip&&findZipEntry(downloadZip,name=>{const p=pathParts(name);return p.includes(id.toLowerCase())&&/(^|\/)(cover|thumbnail)\.(png|jpe?g|webp|gif|avif)$/i.test(name)}));
+  }):[];  const cover=novelDownloadFiles.find(item=>/(^|\/)(cover|thumbnail)\.(png|jpe?g|webp|gif|avif)$/i.test(normalizedZipPath(item.name)));
   if(typeof novel.cover==='string'&&/^https?:\/\//i.test(novel.cover))book.cover=novel.cover;
   else if(cover){const bytes=await cover.async('uint8array');book.cover='data:'+guessMime(cover.name)+';base64,'+bytesToBase64(bytes)}
   const ordered=novel.chapters.map((chapter,index)=>({chapter,index})).sort((a,b)=>{
@@ -718,38 +698,3 @@ export async function importBackup(file,options={}){
   if(isZipSources){
    if(sources.length===1&&!isFolder&&!options.prepared){
     const archive=await JSZip.loadAsync(first);
-    if(archive.file('manifest.json'))restored=await readZipArchive(first);
-    else{const prepared=await inspectLNReaderSources(sources);showLNReaderPreflight(first,prepared,sources);return}
-   }else{
-    const prepared=options.prepared||await inspectLNReaderSources(sources);
-    if(!options.prepared){showLNReaderPreflight(first,prepared,sources);return}
-    restored=await readLNReaderArchive(prepared,put,options.selectedEntryNames);
-   }
-  }else if(options.jsonPrepared){restored=options.jsonPrepared}
-  else{
-   const parsed=JSON.parse(await first.text());
-   try{restored=parseLegacyBackup(parsed)}catch{restored=parseLNReaderJson(parsed);showLNReaderJsonPreflight(first,parsed,restored);return}
-  }
-  if(!restored.persisted&&(!Array.isArray(restored.items)||restored.items.some(item=>!item||!item.id||!['book','paste'].includes(item.kind))))throw new Error('The backup contains an invalid book or paste record.');
-  // LN Reader novels are committed one at a time to bound peak memory. Other backups
-  // retain the existing all-at-once validation and write path.
-  if(!restored.persisted)await putMany(restored.items);
-  applyPreferences(restored);
-  if(Array.isArray(restored.lnReaderCategories))localStorage.setItem('qrLNReaderCategories',JSON.stringify(restored.lnReaderCategories));
-  if(restored.source==='lnreader-zip'||restored.source==='lnreader-json'){
-   const stats=restored.stats||{books:restored.items?.length||0,chapters:0,readable:0},historyKey='qrLNReaderImportHistory';
-   let history=[];try{const saved=JSON.parse(localStorage.getItem(historyKey)||'[]');if(Array.isArray(saved))history=saved}catch{}
-   const names=sources.map(source=>String(source.webkitRelativePath||source.name||'LN Reader source')).filter(Boolean),folderName=String(sources.find(source=>source.webkitRelativePath)?.webkitRelativePath||'').split('/')[0];
-   const bytes=sources.reduce((sum,source)=>sum+(Number(source.size)||0),0);
-   const totalBackupNovels=Number(options.prepared?.novelRecords?.length)||Number(stats.books)||0,importedNovelCount=Number(stats.books)||0,customImport=Boolean(options.prepared&&Array.isArray(options.selectedEntryNames)&&options.selectedEntryNames.length<totalBackupNovels),sourceName=isFolder?(folderName||'Extracted LN Reader folder'):names.length===1?names[0]:names.slice(0,3).join(', ')+(names.length>3?' +'+(names.length-3)+' more':''),report={id:'lnr-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),importedAt:Date.now(),selectedNovels:importedNovelCount,totalBackupNovels,customImport,originalName:sourceName,name:customImport?'Custom backup import · '+sourceName:sourceName,files:names.slice(0,100),format:isFolder?'Extracted folder':sources.some(source=>/\.zip$/i.test(source.name||''))?'ZIP archive':'JSON backup',sizeBytes:bytes,novels:importedNovelCount,chapters:Number(stats.chapters)||0,readableChapters:Number(stats.readable)||0,categories:restored.importCategories||[],settingsFiles:options.prepared?.settingsFiles||[]};
-   history.unshift(report);localStorage.setItem(historyKey,JSON.stringify(history));
-  }
-  if(restored.source==='lnreader-json'){
-   toast('LNReader 1.x · '+restored.items.length+' novels imported; chapter files and reading progress are not in this backup');
-  }else if(restored.source==='lnreader-zip'){
-   const stats=restored.stats||{books:restored.items.length,chapters:0,readable:0};
-   toast('LN Reader imported · '+stats.books+' novels · '+stats.chapters+' chapters · '+stats.readable+' with text');
-  }else toast('Backup restored · '+restored.items.length+' entries imported');
-  location.reload();
- }catch(error){alert('Could not restore backup: '+(error?.message||error))}
-}
