@@ -34,10 +34,11 @@ const cropFor = (width, height, ratio, anchor) => {
   const y = vertical === 'top' ? 0 : vertical === 'bottom' ? height - cropHeight : (height - cropHeight) / 2;
   return {x,y,width:cropWidth,height:cropHeight};
 };
-const outputName = (path, format) => {
+const outputName = (path, format, suffix = '-edited') => {
   const clean = path.replace(/\\/g,'/').split('/').filter(part => part && part !== '.' && part !== '..').join('/');
   const base = clean.replace(/\.[^.]+$/,'');
-  return base + '-edited.' + (format === 'jpeg' ? 'jpg' : format);
+  const safeSuffix = String(suffix ?? '').replace(/[\\/:*?\"<>|]/g,'-');
+  return base + safeSuffix + '.' + (format === 'jpeg' ? 'jpg' : format);
 };
 
 export function initImageBatchTools() {
@@ -47,11 +48,23 @@ export function initImageBatchTools() {
   const status = document.getElementById('imageToolStatus');
   if (!imagesInput || !folderInput || !zipInput) return;
   const setStatus = message => { if (status) status.textContent = message; };
-  document.getElementById('imageToolChooseBatch')?.addEventListener('click', () => imagesInput.click());
-  document.getElementById('imageToolChooseFolder')?.addEventListener('click', () => folderInput.click());
-  document.getElementById('imageToolChooseZip')?.addEventListener('click', () => zipInput.click());
+  document.getElementById('imageToolChoose')?.addEventListener('click', () => {
+    modal('Add images', `
+      <div class="image-batch-picker">
+        <p class="muted tiny">Choose what you want to edit. You can process one image or a whole collection with the same settings.</p>
+        <button type="button" id="imageBatchPickSingle"><span>▧</span><span><b>Choose image</b><small>Open one image in the editor</small></span></button>
+        <button type="button" id="imageBatchPickMultiple"><span>▧</span><span><b>Choose multiple images</b><small>Select individual image files</small></span></button>
+        <button type="button" id="imageBatchPickFolder"><span>▣</span><span><b>Choose folder</b><small>Process supported images in a folder and its subfolders</small></span></button>
+        <button type="button" id="imageBatchPickZip"><span>▤</span><span><b>Choose ZIP archive</b><small>Process images stored inside a ZIP</small></span></button>
+      </div>`);
+    const choose = (id,input) => document.getElementById(id)?.addEventListener('click',() => { closeModal(); input.click(); });
+    choose('imageBatchPickSingle',document.getElementById('imageToolFile'));
+    choose('imageBatchPickMultiple',imagesInput);
+    choose('imageBatchPickFolder',folderInput);
+    choose('imageBatchPickZip',zipInput);
+  });
 
-  const start = async (files, sourceLabel) => {
+  const start = async (files, sourceLabel, suggestedArchiveName = 'quiet-reader-edited-images') => {
     if (!files.length) return;
     if (!window.JSZip) { setStatus('ZIP support is unavailable. Reload the app and try again.'); return; }
     modal('Batch image editor', `
@@ -71,6 +84,8 @@ export function initImageBatchTools() {
             <option value="0.6666666667">Portrait · 2:3</option>
           </select></label>
           <label>Crop position<select id="imageBatchAnchor"><option value="center-center">Centre</option><option value="top-center">Top</option><option value="bottom-center">Bottom</option><option value="center-left">Left</option><option value="center-right">Right</option></select></label>
+          <label>Output ZIP name<input id="imageBatchArchiveName" type="text" maxlength="100" value="${esc(suggestedArchiveName)}" placeholder="quiet-reader-edited-images"></label>
+          <label>Individual file name suffix<input id="imageBatchSuffix" type="text" maxlength="40" value="-edited" placeholder="Optional, e.g. -compressed"></label>
         </div>
         <p class="muted tiny">Crop presets keep the selected aspect ratio and anchor the crop to the chosen position. Maximum dimensions are applied after cropping, preserving aspect ratio. Leave dimensions blank or zero to keep the resulting size.</p>
         <div class="image-batch-actions"><button type="button" id="imageBatchCancel">Cancel</button><button type="button" class="primary" id="imageBatchStart">Process ${files.length} images</button></div>
@@ -85,7 +100,9 @@ export function initImageBatchTools() {
         maxWidth:Math.max(0,Math.min(12000,Number(document.getElementById('imageBatchWidth').value)||0)),
         maxHeight:Math.max(0,Math.min(12000,Number(document.getElementById('imageBatchHeight').value)||0)),
         crop:document.getElementById('imageBatchCrop').value,
-        anchor:document.getElementById('imageBatchAnchor').value
+        anchor:document.getElementById('imageBatchAnchor').value,
+        archiveName:document.getElementById('imageBatchArchiveName').value.trim(),
+        suffix:document.getElementById('imageBatchSuffix').value
       };
       await process(files,settings,sourceLabel);
     };
@@ -94,7 +111,7 @@ export function initImageBatchTools() {
   const process = async (files, settings, sourceLabel) => {
     const host = document.getElementById('modalHost');
     const zip = new JSZip();
-    const rows = [];
+    const processedFiles = [];
     let inputTotal=0, outputTotal=0, completed=0, failed=0;
     host.querySelector('.modal').innerHTML = `
       <div class="image-batch-progress">
@@ -103,7 +120,7 @@ export function initImageBatchTools() {
         <p id="imageBatchStage" class="muted tiny">Preparing images locally…</p>
         <div class="image-batch-total" id="imageBatchTotals">Calculating total sizes…</div>
         <div id="imageBatchRows" class="image-batch-rows"></div>
-        <div class="image-batch-actions"><button type="button" id="imageBatchClose" disabled>Close</button><button type="button" id="imageBatchDownload" class="primary" disabled>Download edited ZIP</button></div>
+        <div class="image-batch-actions"><button type="button" id="imageBatchClose" disabled>Close</button><button type="button" id="imageBatchSaveFolder" disabled>Save images to folder</button><button type="button" id="imageBatchDownload" class="primary" disabled>Download ZIP</button></div>
       </div>`;
     const count = document.getElementById('imageBatchCount');
     const bar = document.getElementById('imageBatchBar');
@@ -112,7 +129,10 @@ export function initImageBatchTools() {
     const list = document.getElementById('imageBatchRows');
     const close = document.getElementById('imageBatchClose');
     const save = document.getElementById('imageBatchDownload');
+    const saveFolder = document.getElementById('imageBatchSaveFolder');
     close.onclick=closeModal;
+    saveFolder.disabled = typeof window.showDirectoryPicker !== 'function';
+    saveFolder.title = saveFolder.disabled ? 'Folder saving requires a browser that supports the File System Access API.' : 'Choose a destination folder and save the processed image files there.';
     const updateTotals=()=>{totals.innerHTML='<b>'+bytes(inputTotal)+'</b> original <span>→</span> <b>'+bytes(outputTotal)+'</b> processed <span>·</span> '+(inputTotal ? ((1-outputTotal/inputTotal)*100).toFixed(1)+'% smaller' : '—');};
     for (let index=0;index<files.length;index++) {
       const item=files[index];
@@ -137,12 +157,12 @@ export function initImageBatchTools() {
         context.drawImage(image,crop.x,crop.y,crop.width,crop.height,0,0,width,height);
         const mime=settings.format==='jpeg'?'image/jpeg':settings.format==='png'?'image/png':'image/webp';
         const blob=await toBlob(canvas,mime,settings.quality/100);
-        const name=outputName(item.path,settings.format);
+        const name=outputName(item.path,settings.format,settings.suffix);
         zip.file(name,blob,{date:new Date()});
         outputTotal+=blob.size; completed++;
         row.classList.add('is-done');
         row.querySelector('.image-batch-row-size').textContent=bytes(file.size)+' → '+bytes(blob.size)+' · '+(file.size?((1-blob.size/file.size)*100).toFixed(1)+'%':'—');
-        rows.push({name,input:file.size,output:blob.size});
+        processedFiles.push({path:name,blob});
         image.close?.();
       } catch(error) {
         failed++; row.classList.add('is-failed');
@@ -160,7 +180,28 @@ export function initImageBatchTools() {
           stage.textContent='Creating ZIP archive · '+Math.round(meta.percent)+'%';
         });
         save.disabled=false;
-        save.onclick=()=>download(archive,'quiet-reader-edited-images.zip');
+        const archiveBase=(settings.archiveName || 'quiet-reader-edited-images').replace(/\\.zip$/i,'').replace(/[\\/:*?"<>|]/g,'-').trim() || 'quiet-reader-edited-images';
+        save.onclick=()=>download(archive,archiveBase+'.zip');
+        saveFolder.disabled = typeof window.showDirectoryPicker !== 'function';
+        saveFolder.onclick=async()=>{
+          if(typeof window.showDirectoryPicker!=='function'){stage.textContent='Folder saving is not supported in this browser. Use Download ZIP instead.';return;}
+          try{
+            const root=await window.showDirectoryPicker({mode:'readwrite'});
+            for(const item of processedFiles){
+              const parts=item.path.split('/').filter(Boolean);
+              const fileName=parts.pop();
+              let directory=root;
+              for(const part of parts) directory=await directory.getDirectoryHandle(part,{create:true});
+              const handle=await directory.getFileHandle(fileName,{create:true});
+              const writable=await handle.createWritable();
+              await writable.write(item.blob);
+              await writable.close();
+            }
+            stage.textContent='Saved '+processedFiles.length+' processed image(s) to the selected folder. Original files were not modified.';
+          }catch(error){
+            if(error?.name!=='AbortError') stage.textContent='Could not save to the selected folder: '+(error?.message||'permission denied');
+          }
+        };
         stage.textContent='Finished · '+completed+' processed'+(failed?', '+failed+' failed':'')+'. '+sourceLabel+' originals were not modified.';
       } catch(error) {
         stage.textContent='Images processed, but ZIP creation failed: '+(error?.message||'unknown error');
@@ -177,7 +218,8 @@ export function initImageBatchTools() {
     if(!accepted.length){setStatus('No supported raster images were found in that selection.');return;}
     const entries=accepted.map(file=>({file,path:file.webkitRelativePath||file.name}));
     if(entries.length===1 && label==='individual images'){await window.dispatchEvent(new CustomEvent('image-batch-single',{detail:entries[0].file}));return;}
-    start(entries,label);
+    const suggested=label==='selected folder' ? (entries[0].path.split('/')[0] || 'edited-images')+'-edited' : 'quiet-reader-edited-images';
+    start(entries,label,suggested);
   };
   imagesInput.addEventListener('change',async()=>{await fromFiles(imagesInput.files,'individual images');imagesInput.value='';});
   folderInput.addEventListener('change',async()=>{await fromFiles(folderInput.files,'selected folder');folderInput.value='';});
@@ -190,7 +232,7 @@ export function initImageBatchTools() {
       const entries=Object.values(archive.files).filter(entry=>!entry.dir&&IMAGE_EXT.test(entry.name)&&!entry.name.split('/').some(part=>part.startsWith('.')));
       if(!entries.length){setStatus('No supported images were found in that ZIP archive.');return;}
       const items=entries.map(entry=>({path:entry.name,size:entry._data?.uncompressedSize||0,getFile:()=>imageFile(entry,entry.name)}));
-      start(items,'ZIP archive');
+      start(items,'ZIP archive',file.name.replace(/\\.zip$/i,'')+'-edited');
     }catch(error){setStatus('Could not read ZIP archive: '+(error?.message||'invalid ZIP'));}
   });
 }

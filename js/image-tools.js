@@ -202,7 +202,6 @@ export function initImageTools() {
     await loadFile(event.target.files?.[0]);
     event.target.value = '';
   });
-  $('imageToolChoose').addEventListener('click', () => fileInput.click());
   $('imageToolEmptyChoose').addEventListener('click', () => fileInput.click());
   $('imageToolDropzone').addEventListener('dragover', event => { event.preventDefault(); event.currentTarget.classList.add('drag-over'); });
   $('imageToolDropzone').addEventListener('dragleave', event => event.currentTarget.classList.remove('drag-over'));
