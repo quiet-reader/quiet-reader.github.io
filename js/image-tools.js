@@ -35,6 +35,50 @@ export function initImageTools() {
   const cropHint = $('imageToolCropHint');
 
   let sourceImage = null, sourceUrl = null, sourceFile = null, outputBlob = null, outputUrl = null;
+  let imageMetadata = { id: '', title: '', artist: '', tags: '', description: '' };
+  const metadataFields = { id: $('imageToolMetaId'), title: $('imageToolMetaTitle'), artist: $('imageToolMetaArtist'), tags: $('imageToolMetaTags'), description: $('imageToolMetaDescription') };
+  const readMetadata = () => Object.fromEntries(Object.entries(metadataFields).map(([key,field]) => [key, field?.value?.trim() || '']));
+  const setMetadata = value => {
+    imageMetadata = { id: '', title: '', artist: '', tags: '', description: '', ...(value || {}) };
+    Object.entries(metadataFields).forEach(([key,field]) => { if (field) field.value = imageMetadata[key] || ''; });
+  };
+  const metadataPlain = value => [
+    value.id && 'ID: ' + value.id, value.title && 'Title: ' + value.title,
+    value.artist && 'Artist: ' + value.artist, value.tags && 'Tags: ' + value.tags,
+    value.description && 'Description: ' + value.description
+  ].filter(Boolean).join('\n');
+  const parseMetadata = value => {
+    const text = String(value || '').replace(/\r/g, '').trim();
+    const read = label => text.match(new RegExp('(?:^|\n)\\s*(?:' + label + ')\\s*[:：]\\s*([^\n]+)', 'i'))?.[1]?.trim() || '';
+    const description = text.match(/(?:^|\n)\s*description\s*[:：]\s*([\s\S]*)$/i)?.[1]?.trim() || text;
+    return { id: read('(?:work\\s*)?id'), title: read('title|name'), artist: read('artist|author|user'), tags: read('tags?'), description };
+  };
+  const blobDataUrl = blob => new Promise((resolve,reject) => {
+    const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(reader.error); reader.readAsDataURL(blob);
+  });
+  const readRichClipboardItem = async item => {
+    const types = [...item.types];
+    const plain = types.includes('text/plain') ? await (await item.getType('text/plain')).text() : '';
+    const html = types.includes('text/html') ? await (await item.getType('text/html')).text() : '';
+    let htmlText = '', embeddedImage = null;
+    if (html) {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        htmlText = (doc.body?.innerText || doc.body?.textContent || '').trim();
+        const src = doc.querySelector('img[src]')?.getAttribute('src') || '';
+        const match = src.match(/^data:(image\\/[^;,]+);base64,([\\s\\S]*)$/i);
+        if (match) embeddedImage = new Blob([Uint8Array.from(atob(match[2]), ch => ch.charCodeAt(0))], { type: match[1] });
+      } catch {}
+    }
+    const imageType = types.find(type => type.startsWith('image/'));
+    const blob = (imageType && await item.getType(imageType)) || embeddedImage;
+    if (!blob || !blob.type.startsWith('image/') || blob.type === 'image/svg+xml') return null;
+    const metadata = parseMetadata(plain.trim() || htmlText);
+    if (!metadata.description && htmlText) metadata.description = htmlText;
+    const ext = ({'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','image/avif':'avif'})[blob.type] || 'png';
+    const stem = (metadata.id || metadata.title || 'pasted-image').replace(/[\\\\/:*?"<>|\\x00-\\x1f]/g, '_');
+    return { file: new File([blob], stem + '.' + ext, { type: blob.type }), metadata };
+  };
   let cropMode = false, cropStart = null, cropRect = null, selectionRect = null;
   let previewTimer = 0, renderGeneration = 0, aspectRatio = 1;
 
