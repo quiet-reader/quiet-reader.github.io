@@ -151,6 +151,7 @@ export function initImageTools() {
       canvas.classList.remove('hidden');
       copyButton.disabled = true;
       downloadButton.disabled = true;
+      $('imageToolReset').disabled = false;
       outputSize.textContent = 'Preparing…';
       setStatus('Image loaded locally. Preparing preview…');
       await updatePreview();
@@ -164,6 +165,7 @@ export function initImageTools() {
     event.target.value = '';
   });
   $('imageToolChoose').addEventListener('click', () => fileInput.click());
+  $('imageToolEmptyChoose').addEventListener('click', () => fileInput.click());
   $('imageToolDropzone').addEventListener('dragover', event => { event.preventDefault(); event.currentTarget.classList.add('drag-over'); });
   $('imageToolDropzone').addEventListener('dragleave', event => event.currentTarget.classList.remove('drag-over'));
   $('imageToolDropzone').addEventListener('drop', async event => {
