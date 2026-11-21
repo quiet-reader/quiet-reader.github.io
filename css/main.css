@@ -1650,3 +1650,6 @@ button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.action
 #modalHost:has(.ln-import-progress) #modalClose{display:none}
 @keyframes ln-import-shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
 @media(prefers-reduced-motion:reduce){.ln-import-progress-track span{animation:none;transition:none}}
+
+.ln-import-progress-track.is-indeterminate span{width:36%!important;animation:ln-import-indeterminate 1.25s ease-in-out infinite,ln-import-shimmer 1.7s linear infinite}
+@keyframes ln-import-indeterminate{0%{transform:translateX(-110%)}100%{transform:translateX(310%)}}
