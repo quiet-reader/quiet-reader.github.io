@@ -54,7 +54,7 @@ async function copyImage(image){
  if(!image)return;
  try{
   const metadata={...(image.metadata||{}),description:image.metadata?.description||image.notes||''};
-  const plain=[metadata.id&&'ID: '+metadata.id,metadata.title&&'Title: '+metadata.title,metadata.artist&&'Artist: '+metadata.artist,metadata.tags&&'Tags: '+metadata.tags,metadata.description&&'Description: '+metadata.description].filter(Boolean).join('\\n');
+  const plain=[metadata.id&&'ID: '+metadata.id,metadata.title&&'Title: '+metadata.title,metadata.artist&&'Artist: '+metadata.artist,metadata.tags&&'Tags: '+metadata.tags,metadata.description&&'Description: '+metadata.description].filter(Boolean).join('\n');
   const html='<div><img src="'+image.data+'" alt="'+esc(metadata.title||image.name||'Gallery image')+'"><div>'+['id','title','artist','tags','description'].filter(key=>metadata[key]).map(key=>'<p><strong>'+key[0].toUpperCase()+key.slice(1)+':</strong> '+esc(metadata[key])+'</p>').join('')+'</div></div>';
   if(navigator.clipboard?.write&&window.ClipboardItem){
    await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([plain],{type:'text/plain'})})]);
@@ -66,16 +66,19 @@ async function copyImage(image){
 }
 function confirmGalleryDelete(imageName){
  return new Promise(resolve=>{
+  const root=document.querySelector('#modalHost .modal');
+  if(!root){resolve(false);return}
   let settled=false;
-  const finish=value=>{if(settled)return;settled=true;closeModal();resolve(value)};
-  const body='<div class="gallery-delete-confirm"><p>Delete <b>'+esc(imageName||'this image')+'</b> from this gallery?</p><p class="muted tiny">This removes the image from this gallery. It cannot be undone unless you have a backup.</p><div class="row wrap"><button type="button" id="cancelGalleryDelete">Cancel</button><span class="grow"></span><button type="button" id="confirmGalleryDelete" class="danger">Delete image</button></div></div>';
-  modal('Delete image?',body,()=>{
-   $('modalClose').onclick=()=>finish(false);
-   $('cancelGalleryDelete').onclick=()=>finish(false);
-   $('confirmGalleryDelete').onclick=()=>finish(true);
-   $('modalBack').addEventListener('click',event=>{if(event.target.id==='modalBack')finish(false)});
-  });
- }
+  const finish=value=>{if(settled)return;settled=true;overlay.remove();resolve(value)};
+  const overlay=document.createElement('div');
+  overlay.className='gallery-delete-overlay';
+  overlay.innerHTML='<section class="gallery-delete-confirm" role="alertdialog" aria-modal="true" aria-labelledby="galleryDeleteTitle"><h3 id="galleryDeleteTitle">Delete image?</h3><p>Delete <b>'+esc(imageName||'this image')+'</b> from this gallery?</p><p class="muted tiny">This removes the image from this gallery. It cannot be undone unless you have a backup.</p><div class="row wrap"><button type="button" data-cancel-gallery-delete>Cancel</button><span class="grow"></span><button type="button" data-confirm-gallery-delete class="danger">Delete image</button></div></section>';
+  root.append(overlay);
+  overlay.querySelector('[data-cancel-gallery-delete]').onclick=()=>finish(false);
+  overlay.querySelector('[data-confirm-gallery-delete]').onclick=()=>finish(true);
+  overlay.addEventListener('click',event=>{if(event.target===overlay)finish(false)});
+  overlay.querySelector('[data-cancel-gallery-delete]').focus();
+ });
 }
 async function openImage(index){
  const book=state.book,gallery=ensureGallery(book),image=gallery.images[index];if(!image)return;
@@ -214,7 +217,7 @@ async function readClipboardGalleryItem(item,index){
  const types=[...item.types],plain=types.includes('text/plain')?await (await item.getType('text/plain')).text():'',html=types.includes('text/html')?await (await item.getType('text/html')).text():'';
  const htmlText=clipboardHtmlText(html),description=plain.trim()||htmlText,workId=clipboardWorkId(plain)||clipboardWorkId(htmlText);
  const metadataText=plain.trim()||htmlText;
- const readField=label=>metadataText.split(/\\r?\\n/).map(line=>line.trim()).find(line=>new RegExp('^(?:'+label+')\\s*[:：]','i').test(line))?.replace(/^[^:：]+[:：]\\s*/,'').trim()||'';
+ const readField=label=>metadataText.split(/\r?\n/).map(line=>line.trim()).find(line=>new RegExp('^(?:'+label+')\\s*[:：]','i').test(line))?.replace(/^[^:：]+[:：]\\s*/,'').trim()||'';
  const metadata={id:workId,title:readField('title|name'),artist:readField('artist|author|user'),tags:readField('tags?'),description:readField('description')||description};
  let blob=null;
  const imageType=types.find(type=>type.startsWith('image/'));
