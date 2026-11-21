@@ -71,7 +71,7 @@ export function initImageTools() {
       } catch {}
     }
     const imageType = types.find(type => type.startsWith('image/'));
-    const blob = (imageType && await item.getType(imageType)) || embeddedImage;
+    const blob = embeddedImage || (imageType && await item.getType(imageType));
     if (!blob || !blob.type.startsWith('image/') || blob.type === 'image/svg+xml') return null;
     const metadata = parseMetadata(plain.trim() || htmlText);
     if (!metadata.description && htmlText) metadata.description = htmlText;
@@ -204,7 +204,7 @@ export function initImageTools() {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     if (outputUrl) URL.revokeObjectURL(outputUrl);
     sourceFile = file;
-    if (metadata) setMetadata(metadata);
+    setMetadata(metadata || {});
     outputBlob = null;
     outputUrl = null;
     $('imageToolOutputPreview').removeAttribute('src');
@@ -409,13 +409,22 @@ export function initImageTools() {
   screen.addEventListener('paste', async event => {
     const clipboard = event.clipboardData;
     if (!clipboard) return;
-    const file = [...(clipboard.items || [])].find(item => item.type.startsWith('image/'))?.getAsFile();
-    if (!file) return;
-    event.preventDefault();
+    let file = [...(clipboard.items || [])].find(item => item.type.startsWith('image/'))?.getAsFile() || null;
     const plain = clipboard.getData('text/plain') || '';
     const html = clipboard.getData('text/html') || '';
     let metadata = parseMetadata(plain);
-    if (!plain && html) { try { const doc = new DOMParser().parseFromString(html,'text/html'); metadata = parseMetadata(doc.body?.innerText || doc.body?.textContent || ''); } catch {} }
+    if (html) {
+      try {
+        const doc = new DOMParser().parseFromString(html,'text/html');
+        const htmlText = doc.body?.innerText || doc.body?.textContent || '';
+        if (!plain) metadata = parseMetadata(htmlText);
+        const src = doc.querySelector('img[src]')?.getAttribute('src') || '';
+        const match = src.match(/^data:(image\\/[^;,]+);base64,([\\s\\S]*)$/i);
+        if (match) file = new File([Uint8Array.from(atob(match[2]), ch => ch.charCodeAt(0))], (metadata.id || metadata.title || 'pasted-image') + '.' + (({'image/jpeg':'jpg','image/png':'png','image/webp':'webp'})[match[1]] || 'png'), {type:match[1]});
+      } catch {}
+    }
+    if (!file) return;
+    event.preventDefault();
     await previewClipboardFile(file, metadata);
   });
   Object.values(metadataFields).forEach(field => field?.addEventListener('input', () => { imageMetadata = readMetadata(); }));
