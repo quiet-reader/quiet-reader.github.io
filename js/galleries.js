@@ -289,6 +289,7 @@ function confirmGalleryBulkDelete(count){
   const finish=value=>{if(settled)return;settled=true;closeModal();resolve(value)};
   const body='<div class="stack"><p>Delete <b>'+count+' unlocked image'+(count===1?'':'s')+'</b> from this gallery?</p><p class="muted tiny">Locked images are protected and will not be deleted. This action cannot be undone unless you have a backup.</p><div class="row"><span class="grow"></span><button type="button" id="cancelGalleryBulkDelete">Cancel</button><button type="button" id="confirmGalleryBulkDelete" class="danger">Delete '+count+' images</button></div></div>';
   modal('Delete selected images?',body,()=>{
+   $('modalClose').onclick=()=>finish(false);
    $('cancelGalleryBulkDelete').onclick=()=>finish(false);
    $('confirmGalleryBulkDelete').onclick=()=>finish(true);
   });
