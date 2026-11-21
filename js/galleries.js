@@ -69,6 +69,7 @@ function confirmGalleryDelete(imageName){
   const root=document.querySelector('#modalHost .modal');
   if(!root){resolve(false);return}
   let settled=false;
+  root.style.position='relative';
   const finish=value=>{if(settled)return;settled=true;overlay.remove();resolve(value)};
   const overlay=document.createElement('div');
   overlay.className='gallery-delete-overlay';
