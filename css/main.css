@@ -1705,3 +1705,16 @@ button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.action
 @media(max-width:900px){.image-tools-layout{grid-template-columns:minmax(0,1fr) 300px}}
 @media(max-width:720px){.image-tools-screen{padding:14px 10px}.image-tools-heading{align-items:flex-start;flex-direction:column}.image-tools-heading-actions{width:100%}.image-tools-heading-actions button{flex:1}.image-tools-layout{grid-template-columns:minmax(0,1fr)}.image-tool-dropzone{min-height:250px}#imageToolCanvas{max-height:48vh}.image-tools-controls{grid-template-columns:1fr}.image-tool-size-summary{gap:5px}.image-tool-size-summary>div{padding:8px}.image-tool-size-summary b{font-size:12px}}
 @media(prefers-reduced-motion:reduce){.image-tool-quality-presets button{transition:none}}
+
+
+/* Image editor: persistent original + live processed output */
+.image-tool-original-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 2px 0;color:var(--muted);font-size:11px}
+.image-tool-original-meta b{color:var(--fg);font-variant-numeric:tabular-nums}
+.image-tool-output-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px;min-width:0}
+.image-tool-output-stage{min-height:280px;display:grid;place-items:center;overflow:hidden;border:1px solid var(--line);border-radius:10px;background-color:var(--panel2);background-image:linear-gradient(45deg,color-mix(in srgb,var(--fg) 4%,transparent) 25%,transparent 25%),linear-gradient(-45deg,color-mix(in srgb,var(--fg) 4%,transparent) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,color-mix(in srgb,var(--fg) 4%,transparent) 75%),linear-gradient(-45deg,transparent 75%,color-mix(in srgb,var(--fg) 4%,transparent) 75%);background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0}
+#imageToolOutputPreview{display:block;width:auto;height:auto;max-width:100%;max-height:52vh;object-fit:contain}
+.image-tool-output-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.image-tool-output-actions button{flex:1}
+.image-tool-output-card .image-tool-size-summary{margin-top:12px}
+.image-tool-output-card .image-tool-status{margin-bottom:0}
+@media(max-width:720px){.image-tool-output-stage{min-height:220px}#imageToolOutputPreview{max-height:42vh}.image-tool-output-actions{display:grid;grid-template-columns:1fr 1fr}.image-tool-output-actions #imageToolReset{grid-column:1/-1}}
