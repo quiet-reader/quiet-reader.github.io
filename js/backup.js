@@ -692,4 +692,38 @@ export async function importBackup(file,options={}){
   const isZipSources=isFolder||sources.length>1||sources.some(source=>/\.zip$/i.test(source?.name||'')||/zip/i.test(source?.type||''));
   if(isZipSources){
    if(sources.length===1&&!isFolder&&!options.prepared){
-    const archive=await JSZip.loadAsync(first);
+    const archive=await JSZip.loadAsync(first);    if(archive.file('manifest.json'))restored=await readZipArchive(first);
+    else{const prepared=await inspectLNReaderSources(sources);showLNReaderPreflight(first,prepared,sources);return}
+   }else{
+    const prepared=options.prepared||await inspectLNReaderSources(sources);
+    if(!options.prepared){showLNReaderPreflight(first,prepared,sources);return}
+    restored=await readLNReaderArchive(prepared,put,options.selectedEntryNames);
+   }
+  }else if(options.jsonPrepared){restored=options.jsonPrepared}
+  else{
+   const parsed=JSON.parse(await first.text());
+   try{restored=parseLegacyBackup(parsed)}catch{restored=parseLNReaderJson(parsed);showLNReaderJsonPreflight(first,parsed,restored);return}
+  }
+  if(!restored.persisted&&(!Array.isArray(restored.items)||restored.items.some(item=>!item||!item.id||!['book','paste'].includes(item.kind))))throw new Error('The backup contains an invalid book or paste record.');
+  // LN Reader novels are committed one at a time to bound peak memory. Other backups
+  // retain the existing all-at-once validation and write path.
+  if(!restored.persisted)await putMany(restored.items);
+  applyPreferences(restored);
+  if(Array.isArray(restored.lnReaderCategories))localStorage.setItem('qrLNReaderCategories',JSON.stringify(restored.lnReaderCategories));
+  if(restored.source==='lnreader-zip'||restored.source==='lnreader-json'){
+   const stats=restored.stats||{books:restored.items?.length||0,chapters:0,readable:0},historyKey='qrLNReaderImportHistory';
+   let history=[];try{const saved=JSON.parse(localStorage.getItem(historyKey)||'[]');if(Array.isArray(saved))history=saved}catch{}
+   const names=sources.map(source=>String(source.webkitRelativePath||source.name||'LN Reader source')).filter(Boolean),folderName=String(sources.find(source=>source.webkitRelativePath)?.webkitRelativePath||'').split('/')[0];
+   const bytes=sources.reduce((sum,source)=>sum+(Number(source.size)||0),0);
+   const totalBackupNovels=Number(options.prepared?.novelRecords?.length)||Number(stats.books)||0,importedNovelCount=Number(stats.books)||0,customImport=Boolean(options.prepared&&Array.isArray(options.selectedEntryNames)&&options.selectedEntryNames.length<totalBackupNovels),sourceName=isFolder?(folderName||'Extracted LN Reader folder'):names.length===1?names[0]:names.slice(0,3).join(', ')+(names.length>3?' +'+(names.length-3)+' more':''),report={id:'lnr-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),importedAt:Date.now(),selectedNovels:importedNovelCount,totalBackupNovels,customImport,originalName:sourceName,name:customImport?'Custom backup import · '+sourceName:sourceName,files:names.slice(0,100),format:isFolder?'Extracted folder':sources.some(source=>/\.zip$/i.test(source.name||''))?'ZIP archive':'JSON backup',sizeBytes:bytes,novels:importedNovelCount,chapters:Number(stats.chapters)||0,readableChapters:Number(stats.readable)||0,categories:restored.importCategories||[],settingsFiles:options.prepared?.settingsFiles||[]};
+   history.unshift(report);localStorage.setItem(historyKey,JSON.stringify(history));
+  }
+  if(restored.source==='lnreader-json'){
+   toast('LNReader 1.x · '+restored.items.length+' novels imported; chapter files and reading progress are not in this backup');
+  }else if(restored.source==='lnreader-zip'){
+   const stats=restored.stats||{books:restored.items.length,chapters:0,readable:0};
+   toast('LN Reader imported · '+stats.books+' novels · '+stats.chapters+' chapters · '+stats.readable+' with text');
+  }else toast('Backup restored · '+restored.items.length+' entries imported');
+  location.reload();
+ }catch(error){alert('Could not restore backup: '+(error?.message||error))}
+}
