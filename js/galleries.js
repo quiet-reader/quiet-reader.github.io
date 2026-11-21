@@ -178,13 +178,56 @@ function renameImage(image,name){
  if(ext&&base.toLowerCase().endsWith(ext.toLowerCase()))base=base.slice(0,-ext.length);
  image.name=base+ext;return true;
 }
+function clipboardBlobFromDataUrl(value){
+ const match=String(value||'').match(/^data:([^;,]+)?(;base64)?,([\\s\\S]*)$/i);if(!match)return null;
+ try{const mime=match[1]||'application/octet-stream',raw=match[3],bytes=match[2]?Uint8Array.from(atob(raw),char=>char.charCodeAt(0)):new TextEncoder().encode(decodeURIComponent(raw));return new Blob([bytes],{type:mime})}catch{return null}
+}
+function clipboardWorkId(text){
+ const match=String(text||'').match(/(?:^|[\\r\\n])\\s*(?:work\\s*)?id\\s*[:：]\\s*([0-9]{3,})/i);return match?.[1]||'';
+}
+function clipboardHtmlText(html){
+ try{const doc=new DOMParser().parseFromString(html,'text/html');doc.querySelectorAll('img').forEach(image=>image.remove());return (doc.body?.innerText||doc.body?.textContent||'').trim()}catch{return ''}
+}
+async function readClipboardGalleryItem(item,index){
+ const types=[...item.types],plain=types.includes('text/plain')?await (await item.getType('text/plain')).text():'',html=types.includes('text/html')?await (await item.getType('text/html')).text():'';
+ const description=plain.trim()||clipboardHtmlText(html),workId=clipboardWorkId(plain)||clipboardWorkId(clipboardHtmlText(html));
+ let blob=null;
+ const imageType=types.find(type=>type.startsWith('image/'));
+ if(imageType)blob=await item.getType(imageType);
+ if(!blob&&html){
+  try{const doc=new DOMParser().parseFromString(html,'text/html'),image=doc.querySelector('img[src]');if(image)blob=clipboardBlobFromDataUrl(image.getAttribute('src'))}catch{}
+ }
+ if(!blob||!blob.type.startsWith('image/'))return null;
+ const extension=({ 'image/jpeg':'jpg','image/svg+xml':'svg' })[blob.type]||blob.type.split('/')[1]?.replace(/^x-/,'')||'png';
+ const fallback='Pasted image '+(index+1),baseName=workId||fallback;
+ return {file:new File([blob],baseName+'.'+extension,{type:blob.type}),name:baseName+'.'+extension,notes:description};
+}
+async function confirmClipboardGalleryImport(items){
+ const previews=await Promise.all(items.map(async item=>({item,url:await dataURL(item.file)})));
+ return new Promise(resolve=>{
+  let settled=false;
+  const finish=value=>{if(settled)return;settled=true;closeModal();resolve(value)};
+  const body='<div class="stack clipboard-gallery-import"><p class="muted tiny">The image, filename and copied description are read from the clipboard. The ID is used as the default filename when present.</p>'+previews.map((entry,index)=>'<section class="clipboard-gallery-entry"><img src="'+entry.url+'" alt="'+esc(entry.item.name)+'"><div class="stack"><label>Image filename<input data-clipboard-name="'+index+'" value="'+esc(entry.item.name)+'"></label><label>Details / description<textarea data-clipboard-notes="'+index+'" rows="5">'+esc(entry.item.notes)+'</textarea></label></div></section>').join('')+'<div class="row wrap"><button type="button" id="cancelClipboardGallery">Cancel</button><span class="grow"></span><button type="button" id="confirmClipboardGallery" class="primary">Add '+previews.length+' image'+(previews.length===1?'':'s')+'</button></div></div>';
+  modal('Preview pasted gallery image'+(previews.length===1?'':'s'),body,()=>{
+   $('modalClose').onclick=()=>finish(null);$('cancelClipboardGallery').onclick=()=>finish(null);
+   $('confirmClipboardGallery').onclick=()=>finish(previews.map((entry,index)=>({file:entry.item.file,name:$('[data-clipboard-name="'+index+'"]').value.trim(),notes:$('[data-clipboard-notes="'+index+'"]').value})));
+   $('modalBack').addEventListener('click',event=>{if(event.target.id==='modalBack')finish(null)});
+  });
+ });
+}
 export async function pasteGalleryImages(){
  const book=state.book;if(!book||book.locked)return toast('Unlock editing first');
- if(!navigator.clipboard?.read)return toast('Clipboard image access is unavailable in this browser');
- try{const items=await navigator.clipboard.read();const files=[];for(const item of items){const type=item.types.find(value=>value.startsWith('image/'));if(type){const blob=await item.getType(type);files.push(new File([blob],'pasted-image-'+(files.length+1)+'.'+(type.split('/')[1]||'png'),{type}))}}
- if(!files.length)return toast('No image found in clipboard');
- await importGalleryFiles(files);
- }catch(error){toast('Could not read clipboard image. Check browser clipboard permission.')}
+ if(!navigator.clipboard?.read)return toast('Clipboard access is unavailable in this browser');
+ try{
+  const clipboardItems=await navigator.clipboard.read(),entries=[];
+  for(const item of clipboardItems){const entry=await readClipboardGalleryItem(item,entries.length);if(entry)entries.push(entry)}
+  if(!entries.length)return toast('No image data found. The clipboard may contain only text or an external image link.');
+  const confirmed=await confirmClipboardGalleryImport(entries);if(!confirmed)return;
+  const gallery=ensureGallery(book);let added=0;
+  for(const item of confirmed){try{const name=item.name.replace(/[\\\\/:*?"<>|\\x00-\\x1f]/g,'_').trim();if(!name)return toast('Enter a valid filename for every image');gallery.images.push({id:uid(),name,data:await dataURL(item.file),mime:item.file.type||'application/octet-stream',size:item.file.size,addedAt:Date.now(),lastOpenedAt:null,notes:item.notes,locked:false,history:[]});added++}catch(error){console.warn('Could not import clipboard gallery image',error)}}
+  if(!book.cover&&gallery.images[0])book.cover=gallery.images[0].data;
+  addEditEvent(book,'Gallery images pasted',added+' images');await persist(book);await refresh();drawBook();setBookTab('gallery');renderGallery();toast(added+' image'+(added===1?'':'s')+' added from clipboard');
+ }catch(error){console.warn('Gallery clipboard import failed',error);toast('Could not read clipboard. Check Chrome clipboard permission and try again.')}
 }
 export async function continueGallery(book=state.book){
  if(!book||book.source!=='gallery')return;
