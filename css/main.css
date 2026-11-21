@@ -1805,3 +1805,7 @@ button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.action
 .gallery-delete-confirm p{line-height:1.5}
 .gallery-image-metadata{display:grid;gap:5px;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);font-size:11px}
 .gallery-image-metadata p{margin:0;overflow-wrap:anywhere}
+
+.image-tool-output-metadata{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+.image-tool-output-metadata>span{max-width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.image-tool-output-metadata b{color:var(--fg)}
