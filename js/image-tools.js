@@ -40,6 +40,7 @@ export function initImageTools() {
   let previewTimer = 0;
   let renderGeneration = 0;
   let aspectRatio = 1;
+  $('imageToolReset').disabled = true;
 
   const formatBytes = bytes => {
     if (!Number.isFinite(bytes)) return '—';
@@ -83,7 +84,7 @@ export function initImageTools() {
     dimensions.textContent = width + ' × ' + height + ' px';
     qualityValue.textContent = format.value === 'png' ? 'Lossless' : quality.value + '%';
     canvas.classList.toggle('is-cropping', cropMode);
-    if (cropMode && cropRect) drawCropOverlay();
+    if (cropMode && selectionRect) drawCropOverlay();
   };
   const drawCropOverlay = () => {
     const selection = selectionRect || cropRect;
@@ -98,7 +99,7 @@ export function initImageTools() {
     context.fillRect(0, y + h, width, height - y - h);
     context.fillRect(0, y, x, h);
     context.fillRect(x + w, y, width - x - w, h);
-    context.strokeStyle = 'var(--accent)';
+    context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#b9f27c';
     context.lineWidth = Math.max(2, width / 500);
     context.setLineDash([8, 5]);
     context.strokeRect(x, y, w, h);
@@ -186,6 +187,12 @@ export function initImageTools() {
   });
 
   quality.addEventListener('input', () => { qualityValue.textContent = quality.value + '%'; schedulePreview(); });
+  document.querySelectorAll('[data-image-quality]').forEach(button => button.addEventListener('click', () => {
+    quality.value = button.dataset.imageQuality;
+    qualityValue.textContent = quality.value + '%';
+    document.querySelectorAll('[data-image-quality]').forEach(item => item.classList.toggle('active', item === button));
+    schedulePreview();
+  }));
   [format, textInput, textSize, textColor, textPosition].forEach(input => input.addEventListener('input', schedulePreview));
   resizeWidth.addEventListener('change', () => {
     const width = Math.max(1, Number(resizeWidth.value) || 1);
@@ -278,8 +285,10 @@ export function initImageTools() {
   $('imageToolReset').addEventListener('click', () => {
     if (!sourceImage) return;
     cropRect = null; selectionRect = null; cropMode = false;
+    aspectRatio = sourceImage.naturalWidth / sourceImage.naturalHeight;
     resizeWidth.value = sourceImage.naturalWidth; resizeHeight.value = sourceImage.naturalHeight;
-    quality.value = '85'; format.value = 'webp'; textInput.value = '';
+    quality.value = '85'; qualityValue.textContent = '85%'; format.value = 'webp'; textInput.value = '';
+    document.querySelectorAll('[data-image-quality]').forEach(button => button.classList.toggle('active', button.dataset.imageQuality === '85'));
     textSize.value = '36'; textColor.value = '#ffffff'; textPosition.value = 'bottom';
     keepRatio.checked = true;
     schedulePreview();
