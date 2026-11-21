@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'quiet-reader-shell-v80';
+const SHELL_CACHE = 'quiet-reader-shell-v81';
 const RUNTIME_CACHE = 'quiet-reader-runtime-v4';
 const SHELL = [
   './', './index.html', './version.json', './css/main.css', './js/app.js', './js/image-tools.js', './js/image-batch-tools.js', './js/reader.js',
