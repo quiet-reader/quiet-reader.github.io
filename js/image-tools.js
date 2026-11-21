@@ -50,8 +50,8 @@ export function initImageTools() {
   const outputDimensions = () => {
     if (!sourceImage) return { width: 0, height: 0 };
     const base = activeCrop() || { x: 0, y: 0, width: sourceImage.naturalWidth, height: sourceImage.naturalHeight };
-    const width = Math.max(1, Math.min(12000, Math.round(Number(resizeWidth.value) || base.width)));
-    const height = Math.max(1, Math.min(12000, Math.round(Number(resizeHeight.value) || base.height)));
+    const width = Math.max(1, Math.min(12000, Math.round(selectionRect ? selectionRect.width : (Number(resizeWidth.value) || base.width))));
+    const height = Math.max(1, Math.min(12000, Math.round(selectionRect ? selectionRect.height : (Number(resizeHeight.value) || base.height))));
     return { width, height, base };
   };
   const drawCropOverlay = () => {
@@ -165,6 +165,7 @@ export function initImageTools() {
       resizeWidth.value = sourceImage.naturalWidth;
       resizeHeight.value = sourceImage.naturalHeight;
       originalSize.textContent = formatBytes(file.size);
+      $('imageToolOriginalSizeMirror').textContent = formatBytes(file.size);
       $('imageToolPreviewEmpty').classList.add('hidden');
       canvas.classList.remove('hidden');
       $('imageToolOutputEmpty').classList.add('hidden');
