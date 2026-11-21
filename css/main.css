@@ -1809,3 +1809,14 @@ button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.action
 .image-tool-output-metadata{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
 .image-tool-output-metadata>span{max-width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);font-size:10px;color:var(--muted);overflow-wrap:anywhere}
 .image-tool-output-metadata b{color:var(--fg)}
+
+/* Compact gallery selection and bulk actions */
+.gallery-compact-toolbar{display:grid;gap:9px;margin:12px 0;padding:11px;border:1px solid var(--line);border-radius:11px;background:var(--panel)}
+.gallery-compact-selection-actions,.gallery-compact-global-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.gallery-compact-selection-actions [data-selected-count]{padding:0 5px}
+.gallery-compact-toolbar button{white-space:nowrap}
+.gallery-compact-toolbar button:disabled{opacity:.42;cursor:not-allowed}
+.gallery-compact-toolbar button.danger{color:var(--danger,var(--fg))}
+.gallery-compact-row input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);flex:0 0 auto}
+.gallery-compact-row.is-locked{opacity:.88}
+@media(max-width:560px){.gallery-compact-selection-actions,.gallery-compact-global-actions{gap:6px}.gallery-compact-toolbar button{font-size:11px;padding:7px 9px}}
