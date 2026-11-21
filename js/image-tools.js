@@ -57,23 +57,28 @@ export function initImageTools() {
   const drawCropOverlay = () => {
     const selection = selectionRect;
     if (!selection || !sourceImage) return;
+    const scaleX = canvas.width / sourceImage.naturalWidth;
+    const scaleY = canvas.height / sourceImage.naturalHeight;
+    const x = selection.x * scaleX, y = selection.y * scaleY;
+    const w = selection.width * scaleX, h = selection.height * scaleY;
     const width = canvas.width, height = canvas.height;
     context.save();
     context.fillStyle = 'rgba(0,0,0,.50)';
-    context.fillRect(0, 0, width, selection.y);
-    context.fillRect(0, selection.y + selection.height, width, height - selection.y - selection.height);
-    context.fillRect(0, selection.y, selection.x, selection.height);
-    context.fillRect(selection.x + selection.width, selection.y, width - selection.x - selection.width, selection.height);
+    context.fillRect(0, 0, width, y);
+    context.fillRect(0, y + h, width, height - y - h);
+    context.fillRect(0, y, x, h);
+    context.fillRect(x + w, y, width - x - w, h);
     context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#b9f27c';
     context.lineWidth = Math.max(2, width / 700);
     context.setLineDash([10, 6]);
-    context.strokeRect(selection.x, selection.y, selection.width, selection.height);
+    context.strokeRect(x, y, w, h);
     context.restore();
   };
   const drawOriginal = () => {
     if (!sourceImage) return;
-    canvas.width = sourceImage.naturalWidth;
-    canvas.height = sourceImage.naturalHeight;
+    const previewScale = Math.min(1, 2400 / Math.max(sourceImage.naturalWidth, sourceImage.naturalHeight));
+    canvas.width = Math.max(1, Math.round(sourceImage.naturalWidth * previewScale));
+    canvas.height = Math.max(1, Math.round(sourceImage.naturalHeight * previewScale));
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.drawImage(sourceImage, 0, 0);
     if (cropMode && selectionRect) drawCropOverlay();
