@@ -282,7 +282,12 @@ export function initImageTools() {
     if (!outputBlob) return;
     try {
       if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Image clipboard writing is not supported in this browser. Use Download image instead.');
-      await navigator.clipboard.write([new ClipboardItem({ [outputBlob.type]: outputBlob })]);
+      let clipboardBlob = outputBlob;
+      if (typeof ClipboardItem.supports === 'function' && !ClipboardItem.supports(outputBlob.type)) {
+        clipboardBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      }
+      if (!clipboardBlob) throw new Error('This browser could not prepare a clipboard-compatible image. Use Download image instead.');
+      await navigator.clipboard.write([new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })]);
       setStatus('Image copied to clipboard.');
     } catch (error) { setStatus(error.message || 'Could not copy image to clipboard.'); }
   });
