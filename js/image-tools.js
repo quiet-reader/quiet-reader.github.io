@@ -112,8 +112,13 @@ export function initImageTools() {
     if (!sourceImage) return;
     const generation = ++renderGeneration;
     drawSource();
-    const blob = await makeBlob();
-    if (generation !== renderGeneration || !blob) return;
+    let blob = null;
+    try { blob = await makeBlob(); } catch (error) {
+      if (generation === renderGeneration) setStatus('Could not create this image preview: ' + (error?.message || 'unsupported image dimensions'));
+      return;
+    }
+    if (generation !== renderGeneration) return;
+    if (!blob) { outputBlob = null; copyButton.disabled = true; downloadButton.disabled = true; setStatus('This image format could not be exported by the browser. Try JPEG, PNG or WebP.'); return; }
     outputBlob = blob;
     outputSize.textContent = formatBytes(blob.size);
     const delta = sourceFile?.size ? (1 - blob.size / sourceFile.size) * 100 : 0;
@@ -128,12 +133,15 @@ export function initImageTools() {
     previewTimer = setTimeout(updatePreview, 160);
   };
   const loadFile = async file => {
-    if (!file || !file.type.startsWith('image/')) {
-      setStatus('Choose a supported image file.');
+    if (!file || !file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+      setStatus('Choose a raster image (PNG, JPEG, WebP, GIF, BMP or another browser-supported bitmap). SVG files are not opened to prevent embedded external resources from loading.');
       return;
     }
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     sourceFile = file;
+    outputBlob = null;
+    copyButton.disabled = true;
+    downloadButton.disabled = true;
     sourceUrl = URL.createObjectURL(file);
     sourceImage = new Image();
     sourceImage.onload = async () => {
