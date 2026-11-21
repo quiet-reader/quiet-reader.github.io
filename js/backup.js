@@ -186,16 +186,18 @@ const zipPathIndexCache=new WeakMap();
 const chapterFolderCache=new WeakMap();
 function zipFiles(zip){if(!zip||typeof zip!=='object')return [];let files=zipFileCache.get(zip);if(!files){files=Object.values(zip.files||{}).filter(entry=>!entry.dir);zipFileCache.set(zip,files)}return files}
 function zipPathIndex(zip){let index=zipPathIndexCache.get(zip);if(index)return index;const byPath=new Map(),bySegment=new Map();for(const entry of zipFiles(zip))byPath.set(normalizedZipPath(entry.name),entry);index={byPath,bySegment};zipPathIndexCache.set(zip,index);return index}
-function primeZipPathIndex(zip,novelRecords){
+async function primeZipPathIndex(zip,novelRecords,onProgress){
  const novelIds=new Set(novelRecords.map(record=>String(record.novel?.id??record.novel?.novelId??'').toLowerCase()).filter(Boolean));
- const byPath=new Map(),bySegment=new Map();
- // Traverse the directory once, but retain only paths belonging to selected novels.
- for(const entry of zipFiles(zip)){
-  const path=normalizedZipPath(entry.name),parts=pathParts(path);
-  if(!parts.some(part=>novelIds.has(part)))continue;
-  byPath.set(path,entry);
-  for(const part of new Set(parts)){if(!bySegment.has(part))bySegment.set(part,[]);bySegment.get(part).push(entry)}
+ const byPath=new Map(),bySegment=new Map(),entries=zipFiles(zip),total=entries.length;
+ for(let index=0;index<total;index++){
+  const entry=entries[index],path=normalizedZipPath(entry.name),parts=pathParts(path);
+  if(parts.some(part=>novelIds.has(part))){
+   byPath.set(path,entry);
+   for(const part of new Set(parts)){if(!bySegment.has(part))bySegment.set(part,[]);bySegment.get(part).push(entry)}
+  }
+  if((index+1)%2000===0){onProgress?.(index+1,total);await new Promise(resolve=>setTimeout(resolve,0))}
  }
+ onProgress?.(total,total);
  zipPathIndexCache.set(zip,{byPath,bySegment});
 }
 function findZipEntry(zip,predicate){return zipFiles(zip).find(entry=>predicate(entry.name.split(String.fromCharCode(92)).join('/')))}
@@ -471,6 +473,23 @@ function showLNReaderPreflight(file,report,source=file){
 }
 function readLNReaderCategoryRegistry(){try{const value=JSON.parse(localStorage.getItem('qrLNReaderCategories')||'[]');return Array.isArray(value)?value.map(name=>String(name||'').trim()).filter(Boolean):[]}catch{return []}}
 function createLNReaderCategoryResolver(){const names=[],byKey=new Map();for(const value of [...readLNReaderCategoryRegistry(),...state.books.filter(book=>book.source==='lnreader').flatMap(book=>book.lnReader?.categories||[])]){const clean=String(value||'').trim(),key=clean.toLocaleLowerCase();if(clean&&!byKey.has(key)){byKey.set(key,clean);names.push(clean)}}return{name(name){const clean=String(name||'').trim();if(!clean)return '';const key=clean.toLocaleLowerCase();if(byKey.has(key))return byKey.get(key);byKey.set(key,clean);names.push(clean);return clean},all(){return [...names]}}}
+function showLNReaderImportProgress(totalNovels,totalChapters){
+ const html='<div class="stack ln-import-progress"><div class="ln-import-stage" id="lnImportStage">Preparing selected novels…</div><div class="ln-import-progress-track" role="progressbar" aria-label="LN Reader import progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="lnImportProgressFill"></span></div><div class="row between ln-import-progress-meta"><b id="lnImportPercent">0%</b><span id="lnImportCounts">0 / '+totalChapters+' chapters · 0 / '+totalNovels+' novels</span></div><div class="ln-import-current"><small>Currently processing</small><b id="lnImportNovel">Preparing archive</b><span id="lnImportChapter">Opening selected content archives…</span></div><div class="ln-import-subtext" id="lnImportSubtext">The import will continue in this window. Please keep this tab open.</div></div>';
+ modal('Importing LN Reader backup',html,()=>{const close=$('modalClose');if(close)close.hidden=true});
+ const update=(state={})=>{
+  const processed=Math.max(0,Number(state.processedChapters)||0),percent=totalChapters?Math.min(100,Math.round(processed/totalChapters*100)):(state.completed?100:0);
+  const fill=$('lnImportProgressFill'),track=document.querySelector('.ln-import-progress-track'),label=$('lnImportPercent'),counts=$('lnImportCounts'),stage=$('lnImportStage'),novel=$('lnImportNovel'),chapter=$('lnImportChapter'),sub=$('lnImportSubtext');
+  if(!fill||!track)return;
+  fill.style.width=percent+'%';track.setAttribute('aria-valuenow',String(percent));
+  if(label)label.textContent=percent+'%';
+  if(counts)counts.textContent=processed+' / '+totalChapters+' chapters · '+(state.completedNovels||0)+' / '+totalNovels+' novels';
+  if(stage)stage.textContent=state.stage||'Importing selected novels…';
+  if(novel)novel.textContent=state.novel||'Preparing archive';
+  if(chapter)chapter.textContent=state.chapter||'Please wait…';
+  if(sub)sub.textContent=state.subtext||'The import will continue in this window. Please keep this tab open.';
+ };
+ return update;
+}
 async function readLNReaderArchive(prepared,onBook,selectedEntryNames){
  const dataZip=prepared?.dataZip;
  if(!dataZip)throw new Error('This is not a recognised LN Reader archive or extracted backup folder.');
@@ -483,11 +502,15 @@ async function readLNReaderArchive(prepared,onBook,selectedEntryNames){
  const selectedSet=Array.isArray(selectedEntryNames)?new Set(selectedEntryNames):null;
  const selectedRecords=(novelRecords.length?novelRecords:novelEntries.map(entry=>({entry,novel:null}))).filter(record=>!selectedSet||selectedSet.has(String(record.entry?.name||'')));
  if(selectedSet&&!selectedRecords.length)throw new Error('Select at least one novel to import.');
- toast('Checking downloaded chapter files for selected novels…');
+ const expectedChapters=selectedRecords.reduce((sum,record)=>sum+normalizeChapterList(record.novel?.chapters).length,0);
+ const updateProgress=showLNReaderImportProgress(selectedRecords.length,expectedChapters);
+ const progress={processedChapters:0,completedNovels:0};
+ updateProgress({...progress,stage:'Opening selected content archives…',novel:'Preparing archive',chapter:'Loading downloaded chapter ZIPs…',subtext:'Large archives can take a while to open. Progress will update as entries are indexed and chapters are processed.'});
  const contentArchives=await loadLNReaderContentArchives(prepared);
  const chapterSources=[...contentArchives,dataZip].filter((archive,index,list)=>archive&&list.indexOf(archive)===index);
  const downloadZip=chapterSources.reduce((merged,archive)=>combineArchiveViews(merged,archive),null)||dataZip;
- primeZipPathIndex(downloadZip,selectedRecords);
+ updateProgress({...progress,stage:'Indexing selected novel files…',novel:'Scanning archive directory',chapter:'Finding paths for selected novel IDs…'});
+ await primeZipPathIndex(downloadZip,selectedRecords,(done,total)=>updateProgress({...progress,stage:'Indexing selected novel files…',novel:'Scanning archive directory',chapter:done+' / '+total+' archive entries checked',subtext:'Only paths matching the selected novels are retained in the lookup index.'}));
  const items=[];let importedBooks=0,totalChapters=0,readableChapters=0;
  for(const record of selectedRecords){
   const entry=record.entry;let novel=record.novel;
@@ -521,10 +544,11 @@ async function readLNReaderArchive(prepared,onBook,selectedEntryNames){
   });
   let lastReadIndex=-1,lastReadAt=0;book.readingHistory=[];
   for(let position=0;position<ordered.length;position++){
-   const {chapter}=ordered[position];
+   const {chapter}=ordered[position],chapterTitle=String(chapter.name||chapter.title||'Chapter '+(position+1)),novelTitle=String(novel.name||id);
+   updateProgress({...progress,stage:'Importing chapter content…',novel:novelTitle,chapter:'Chapter '+(position+1)+' / '+ordered.length+' · '+chapterTitle});
    const decoded=await readDownloadedChapter(downloadZip,pluginId,id,chapter,position);
    if(position&&position%12===0)await new Promise(resolve=>setTimeout(resolve,0));
-   if(position&&position%50===0)toast('LN Reader import · '+String(novel.name||id)+' · '+position+'/'+ordered.length+' chapters');
+   if(position&&position%50===0)toast('LN Reader import · '+novelTitle+' · '+position+'/'+ordered.length+' chapters');
    let text=decoded.text,images=decoded.images;
    if(!text&&downloadZip){
     const html=chapterHtmlEntry(downloadZip,pluginId,id,chapter);
@@ -538,12 +562,18 @@ async function readLNReaderArchive(prepared,onBook,selectedEntryNames){
     lnReader:{id:chapter.id,url:lnReaderChapterUrl(chapter,novel),path:chapter.path||'',chapterNumber:chapter.chapterNumber??position+1,page:chapter.page??'1',scanlator:chapter.scanlator||'',read:chapter.unread===false,downloaded:Boolean(chapter.isDownloaded)||Boolean(text||images.length),progress:Number(chapter.progress)||0,timeSpent:Number(chapter.timeSpent)||0}
    });
    if(chapter.bookmark)book.bookmarks.push({id:safeId(),chapter:chapterIndex,offset:0,text:String(chapter.name||'Chapter '+(position+1)),created:now});
+   progress.processedChapters++;
+   updateProgress({...progress,stage:'Importing chapter content…',novel:novelTitle,chapter:'Completed '+(position+1)+' / '+ordered.length+' chapters'});
+   if(position%8===7)await new Promise(resolve=>setTimeout(resolve,0));
   }
   book.progress={chapter:Math.max(0,lastReadIndex),offset:0};book.readingHistory=book.readingHistory.slice(-100);book.updated=Date.now();
   totalChapters+=book.chapters.length;readableChapters+=book.chapters.filter(chapter=>String(chapter.text||'').trim()).length;
   if(onBook){await onBook(book);items.push({id:book.id,kind:'book'});importedBooks++;if(importedBooks%3===0)toast('LN Reader import · '+importedBooks+' novels saved');await new Promise(resolve=>setTimeout(resolve,0))}else{items.push(book);importedBooks++}
+  progress.completedNovels++;
+  updateProgress({...progress,stage:'Novel saved successfully',novel:String(novel.name||id),chapter:ordered.length?'All '+ordered.length+' chapters processed':'No chapter records in this novel',subtext:'Saved '+progress.completedNovels+' of '+selectedRecords.length+' selected novels.'});
  }
  if(!importedBooks)throw new Error('No readable novels were found in this LNReader backup.');
+ updateProgress({...progress,completed:true,stage:'Import completed',novel:'All selected novels saved',chapter:progress.processedChapters+' / '+expectedChapters+' chapters processed',subtext:'Finishing the import record and refreshing your library…'});
  // Persist each completed novel before moving on, so the importer does not retain every
  // novel and its decoded images in RAM until the entire archive finishes.
  return {items,theme:null,preferences:null,source:'lnreader-zip',persisted:Boolean(onBook),lnReaderCategories:categoryRegistry.all(),importCategories:[...importedCategories],stats:{books:importedBooks,chapters:totalChapters,readable:readableChapters}};
