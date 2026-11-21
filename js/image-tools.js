@@ -1,10 +1,14 @@
+import {confirmImagePreview} from './image-preview.js';
+
 const $ = id => document.getElementById(id);
 
 export function initImageTools() {
   const screen = $('screen-tools');
   const canvas = $('imageToolCanvas');
   const context = canvas?.getContext('2d');
-  if (!screen || !canvas || !context) return;
+  const outputCanvas = $('imageToolOutputCanvas');
+  const outputContext = outputCanvas?.getContext('2d');
+  if (!screen || !canvas || !context || !outputCanvas || !outputContext) return;
 
   const fileInput = $('imageToolFile');
   const quality = $('imageToolQuality');
@@ -29,19 +33,11 @@ export function initImageTools() {
   const cancelCropButton = $('imageToolCancelCrop');
   const cropHint = $('imageToolCropHint');
 
-  let sourceImage = null;
-  let sourceUrl = null;
-  let sourceFile = null;
-  let outputBlob = null;
-  let cropMode = false;
-  let cropStart = null;
-  let cropRect = null;
-  let selectionRect = null;
-  let previewTimer = 0;
-  let renderGeneration = 0;
-  let aspectRatio = 1;
-  $('imageToolReset').disabled = true;
+  let sourceImage = null, sourceUrl = null, sourceFile = null, outputBlob = null, outputUrl = null;
+  let cropMode = false, cropStart = null, cropRect = null, selectionRect = null;
+  let previewTimer = 0, renderGeneration = 0, aspectRatio = 1;
 
+  $('imageToolReset').disabled = true;
   const formatBytes = bytes => {
     if (!Number.isFinite(bytes)) return '—';
     if (bytes < 1024) return bytes + ' B';
@@ -50,125 +46,145 @@ export function initImageTools() {
   };
   const setStatus = message => { status.textContent = message; };
   const mimeForFormat = () => format.value === 'jpeg' ? 'image/jpeg' : format.value === 'png' ? 'image/png' : 'image/webp';
+  const activeCrop = () => selectionRect || cropRect;
   const outputDimensions = () => {
     if (!sourceImage) return { width: 0, height: 0 };
-    const base = cropRect || { x: 0, y: 0, width: sourceImage.naturalWidth, height: sourceImage.naturalHeight };
-    let width = Math.max(1, Math.round(Number(resizeWidth.value) || base.width));
-    let height = Math.max(1, Math.round(Number(resizeHeight.value) || base.height));
-    return { width: Math.min(12000, width), height: Math.min(12000, height), base };
+    const base = activeCrop() || { x: 0, y: 0, width: sourceImage.naturalWidth, height: sourceImage.naturalHeight };
+    const width = Math.max(1, Math.min(12000, Math.round(Number(resizeWidth.value) || base.width)));
+    const height = Math.max(1, Math.min(12000, Math.round(Number(resizeHeight.value) || base.height)));
+    return { width, height, base };
   };
-  const drawSource = () => {
+  const drawCropOverlay = () => {
+    const selection = selectionRect;
+    if (!selection || !sourceImage) return;
+    const width = canvas.width, height = canvas.height;
+    context.save();
+    context.fillStyle = 'rgba(0,0,0,.50)';
+    context.fillRect(0, 0, width, selection.y);
+    context.fillRect(0, selection.y + selection.height, width, height - selection.y - selection.height);
+    context.fillRect(0, selection.y, selection.x, selection.height);
+    context.fillRect(selection.x + selection.width, selection.y, width - selection.x - selection.width, selection.height);
+    context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#b9f27c';
+    context.lineWidth = Math.max(2, width / 700);
+    context.setLineDash([10, 6]);
+    context.strokeRect(selection.x, selection.y, selection.width, selection.height);
+    context.restore();
+  };
+  const drawOriginal = () => {
     if (!sourceImage) return;
+    canvas.width = sourceImage.naturalWidth;
+    canvas.height = sourceImage.naturalHeight;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(sourceImage, 0, 0);
+    if (cropMode && selectionRect) drawCropOverlay();
+    dimensions.textContent = sourceImage.naturalWidth + ' × ' + sourceImage.naturalHeight + ' px';
+    canvas.classList.toggle('is-cropping', cropMode);
+  };
+  const drawOutput = () => {
     const { width, height, base } = outputDimensions();
-    canvas.width = width;
-    canvas.height = height;
-    context.clearRect(0, 0, width, height);
+    outputCanvas.width = width;
+    outputCanvas.height = height;
+    outputContext.clearRect(0, 0, width, height);
     if (format.value === 'jpeg') {
-      context.fillStyle = '#ffffff';
-      context.fillRect(0, 0, width, height);
+      outputContext.fillStyle = '#ffffff';
+      outputContext.fillRect(0, 0, width, height);
     }
-    context.drawImage(sourceImage, base.x, base.y, base.width, base.height, 0, 0, width, height);
+    outputContext.drawImage(sourceImage, base.x, base.y, base.width, base.height, 0, 0, width, height);
     const label = textInput.value.trim();
     if (label) {
       const size = Math.max(10, Math.min(240, Number(textSize.value) || 36)) * (width / Math.max(1, base.width));
-      context.font = '700 ' + Math.max(10, size) + 'px system-ui, sans-serif';
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
-      const y = textPosition.value === 'top' ? size * 1.5 : textPosition.value === 'center' ? height / 2 : height - size * 1.5;
-      context.lineWidth = Math.max(2, size * .08);
-      context.strokeStyle = 'rgba(0,0,0,.62)';
-      context.fillStyle = textColor.value;
-      context.strokeText(label, width / 2, y, width * .9);
-      context.fillText(label, width / 2, y, width * .9);
+      const [horizontal, vertical] = textPosition.value.split('-');
+      const padding = Math.max(10, size * .55);
+      outputContext.font = '700 ' + Math.max(10, size) + 'px system-ui, sans-serif';
+      outputContext.textAlign = horizontal;
+      outputContext.textBaseline = 'middle';
+      const x = horizontal === 'left' ? padding : horizontal === 'right' ? width - padding : width / 2;
+      const y = vertical === 'top' ? padding + size / 2 : vertical === 'bottom' ? height - padding - size / 2 : height / 2;
+      outputContext.lineWidth = Math.max(2, size * .08);
+      outputContext.strokeStyle = 'rgba(0,0,0,.62)';
+      outputContext.fillStyle = textColor.value;
+      outputContext.strokeText(label, x, y, Math.max(1, width - padding * 2));
+      outputContext.fillText(label, x, y, Math.max(1, width - padding * 2));
     }
-    dimensions.textContent = width + ' × ' + height + ' px';
+    $('imageToolOutputDimensions').textContent = width + ' × ' + height + ' px';
     qualityValue.textContent = format.value === 'png' ? 'Lossless' : quality.value + '%';
-    canvas.classList.toggle('is-cropping', cropMode);
-    if (cropMode && selectionRect) drawCropOverlay();
   };
-  const drawCropOverlay = () => {
-    const selection = selectionRect || cropRect;
-    if (!selection || !sourceImage) return;
-    const { width, height, base } = outputDimensions();
-    const scaleX = width / base.width, scaleY = height / base.height;
-    const x = (selection.x - base.x) * scaleX, y = (selection.y - base.y) * scaleY;
-    const w = selection.width * scaleX, h = selection.height * scaleY;
-    context.save();
-    context.fillStyle = 'rgba(0,0,0,.48)';
-    context.fillRect(0, 0, width, y);
-    context.fillRect(0, y + h, width, height - y - h);
-    context.fillRect(0, y, x, h);
-    context.fillRect(x + w, y, width - x - w, h);
-    context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#b9f27c';
-    context.lineWidth = Math.max(2, width / 500);
-    context.setLineDash([8, 5]);
-    context.strokeRect(x, y, w, h);
-    context.restore();
-  };
-  const makeBlob = () => new Promise(resolve => {
-    canvas.toBlob(resolve, mimeForFormat(), Number(quality.value) / 100);
-  });
+  const makeBlob = () => new Promise(resolve => outputCanvas.toBlob(resolve, mimeForFormat(), Number(quality.value) / 100));
   const updatePreview = async () => {
     if (!sourceImage) return;
     const generation = ++renderGeneration;
-    drawSource();
-    let blob = null;
+    drawOriginal();
+    drawOutput();
+    let blob;
     try { blob = await makeBlob(); } catch (error) {
-      if (generation === renderGeneration) setStatus('Could not create this image preview: ' + (error?.message || 'unsupported image dimensions'));
+      if (generation === renderGeneration) setStatus('Could not create output preview: ' + (error?.message || 'unsupported image dimensions'));
       return;
     }
     if (generation !== renderGeneration) return;
-    if (!blob) { outputBlob = null; copyButton.disabled = true; downloadButton.disabled = true; setStatus('This image format could not be exported by the browser. Try JPEG, PNG or WebP.'); return; }
+    if (!blob) {
+      outputBlob = null; copyButton.disabled = true; downloadButton.disabled = true;
+      setStatus('This format could not be exported by the browser. Try JPEG, PNG or WebP.');
+      return;
+    }
     outputBlob = blob;
+    if (outputUrl) URL.revokeObjectURL(outputUrl);
+    outputUrl = URL.createObjectURL(blob);
+    $('imageToolOutputPreview').src = outputUrl;
     outputSize.textContent = formatBytes(blob.size);
     const delta = sourceFile?.size ? (1 - blob.size / sourceFile.size) * 100 : 0;
     savings.textContent = delta >= 0 ? delta.toFixed(1) + '% smaller' : Math.abs(delta).toFixed(1) + '% larger';
     savings.classList.toggle('is-negative', delta < 0);
     copyButton.disabled = false;
     downloadButton.disabled = false;
-    setStatus('Preview updated · ' + blob.type.replace('image/', '').toUpperCase());
+    setStatus('Output updated · ' + blob.type.replace('image/', '').toUpperCase());
   };
   const schedulePreview = () => {
     clearTimeout(previewTimer);
-    previewTimer = setTimeout(updatePreview, 160);
+    previewTimer = setTimeout(updatePreview, 120);
   };
   const loadFile = async file => {
     if (!file || !file.type.startsWith('image/') || file.type === 'image/svg+xml') {
-      setStatus('Choose a raster image (PNG, JPEG, WebP, GIF, BMP or another browser-supported bitmap). SVG files are not opened to prevent embedded external resources from loading.');
+      setStatus('Choose a raster image. SVG files are not opened to prevent embedded external resources from loading.');
       return;
     }
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+    if (outputUrl) URL.revokeObjectURL(outputUrl);
     sourceFile = file;
     outputBlob = null;
+    outputUrl = null;
+    $('imageToolOutputPreview').removeAttribute('src');
     copyButton.disabled = true;
     downloadButton.disabled = true;
     sourceUrl = URL.createObjectURL(file);
     sourceImage = new Image();
     sourceImage.onload = async () => {
       aspectRatio = sourceImage.naturalWidth / sourceImage.naturalHeight;
-      cropRect = null;
-      selectionRect = null;
-      cropStart = null;
-      cropMode = false;
-      cropButton.disabled = false;
-      applyCropButton.disabled = true;
-      cancelCropButton.disabled = true;
-      cropHint.textContent = 'Choose Crop, then drag across the image to select the area to keep.';
+      cropRect = null; selectionRect = null; cropStart = null; cropMode = false;
+      cropButton.disabled = false; applyCropButton.disabled = true; cancelCropButton.disabled = true;
+      cropHint.textContent = 'Choose Crop, then drag over the original image to select the area to keep.';
       resizeWidth.value = sourceImage.naturalWidth;
       resizeHeight.value = sourceImage.naturalHeight;
       originalSize.textContent = formatBytes(file.size);
-      dimensions.textContent = sourceImage.naturalWidth + ' × ' + sourceImage.naturalHeight + ' px';
       $('imageToolPreviewEmpty').classList.add('hidden');
       canvas.classList.remove('hidden');
-      copyButton.disabled = true;
-      downloadButton.disabled = true;
+      $('imageToolOutputEmpty').classList.add('hidden');
+      $('imageToolOutputPreview').classList.remove('hidden');
       $('imageToolReset').disabled = false;
       outputSize.textContent = 'Preparing…';
-      setStatus('Image loaded locally. Preparing preview…');
+      setStatus('Image loaded locally. Preparing output preview…');
       await updatePreview();
     };
     sourceImage.onerror = () => setStatus('This image could not be decoded by the browser.');
     sourceImage.src = sourceUrl;
+  };
+  const previewClipboardFile = async file => {
+    if (!file) return false;
+    if (!(await confirmImagePreview(file, { title: 'Preview image to edit', confirmLabel: 'Open in editor' }))) {
+      setStatus('Paste cancelled. The editor image was not changed.');
+      return false;
+    }
+    await loadFile(file);
+    return true;
   };
 
   fileInput.addEventListener('change', async event => {
@@ -190,10 +206,14 @@ export function initImageTools() {
       const items = await navigator.clipboard.read();
       for (const item of items) {
         const type = item.types.find(value => value.startsWith('image/'));
-        if (type) { await loadFile(new File([await item.getType(type)], 'pasted-image.' + (type.split('/')[1] || 'png'), { type })); return; }
+        if (type) {
+          const blob = await item.getType(type);
+          await previewClipboardFile(new File([blob], 'pasted-image.' + (type.split('/')[1] || 'png'), { type }));
+          return;
+        }
       }
       throw new Error('No image found on the clipboard.');
-    } catch (error) { setStatus(error.message || 'Could not read clipboard. Use Choose image instead.'); }
+    } catch (error) { setStatus(error.message || 'Could not read clipboard image.'); }
   });
 
   quality.addEventListener('input', () => { qualityValue.textContent = quality.value + '%'; schedulePreview(); });
@@ -217,42 +237,42 @@ export function initImageTools() {
     if (keepRatio.checked) resizeWidth.value = Math.max(1, Math.round(height * aspectRatio));
     schedulePreview();
   });
-  keepRatio.addEventListener('change', () => { if (keepRatio.checked && sourceImage) resizeHeight.value = Math.max(1, Math.round(Number(resizeWidth.value) / aspectRatio)); schedulePreview(); });
+  keepRatio.addEventListener('change', () => {
+    if (keepRatio.checked && sourceImage) resizeHeight.value = Math.max(1, Math.round(Number(resizeWidth.value) / aspectRatio));
+    schedulePreview();
+  });
 
   cropButton.addEventListener('click', () => {
     if (!sourceImage) return;
-    cropMode = true;
-    cropStart = null;
-    selectionRect = null;
-    applyCropButton.disabled = true;
-    cancelCropButton.disabled = false;
-    cropHint.textContent = 'Drag on the image to select the crop area, then choose Apply crop.';
-    canvas.classList.add('is-cropping');
+    cropMode = true; cropStart = null; selectionRect = null;
+    applyCropButton.disabled = true; cancelCropButton.disabled = false;
+    cropHint.textContent = 'Drag on the original image to select the crop area. The output preview below updates to that selection.';
+    drawOriginal();
     setStatus('Crop selection mode');
   });
   cancelCropButton.addEventListener('click', () => {
     cropMode = false; cropStart = null; selectionRect = null;
     applyCropButton.disabled = true; cancelCropButton.disabled = true;
     schedulePreview();
-    cropHint.textContent = 'Choose Crop, then drag across the image to select the area to keep.';
+    cropHint.textContent = 'Crop selection cancelled. Previous crop and compression settings are retained.';
   });
   applyCropButton.addEventListener('click', () => {
     if (!selectionRect) return;
-    cropRect = selectionRect;
-    selectionRect = null;
-    cropMode = false;
+    cropRect = { ...selectionRect };
+    selectionRect = null; cropMode = false;
     resizeWidth.value = Math.round(cropRect.width);
     resizeHeight.value = Math.round(cropRect.height);
     aspectRatio = cropRect.width / cropRect.height;
     applyCropButton.disabled = true; cancelCropButton.disabled = true;
     schedulePreview();
-    cropHint.textContent = 'Crop applied. You can continue resizing or select Crop again.';
+    cropHint.textContent = 'Crop applied. The output preview below shows the cropped image.';
   });
   const pointerPoint = event => {
     const rect = canvas.getBoundingClientRect();
-    const base = cropRect || { x: 0, y: 0, width: sourceImage.naturalWidth, height: sourceImage.naturalHeight };
-    return { x: base.x + Math.max(0, Math.min(base.width, (event.clientX - rect.left) * base.width / rect.width)),
-      y: base.y + Math.max(0, Math.min(base.height, (event.clientY - rect.top) * base.height / rect.height)) };
+    return {
+      x: Math.max(0, Math.min(sourceImage.naturalWidth, (event.clientX - rect.left) * sourceImage.naturalWidth / rect.width)),
+      y: Math.max(0, Math.min(sourceImage.naturalHeight, (event.clientY - rect.top) * sourceImage.naturalHeight / rect.height))
+    };
   };
   canvas.addEventListener('pointerdown', event => {
     if (!cropMode || !sourceImage) return;
@@ -260,35 +280,37 @@ export function initImageTools() {
     cropStart = pointerPoint(event);
     selectionRect = { x: cropStart.x, y: cropStart.y, width: 1, height: 1 };
     canvas.setPointerCapture(event.pointerId);
-    drawSource();
+    drawOriginal();
   });
   canvas.addEventListener('pointermove', event => {
     if (!cropMode || !cropStart || !sourceImage) return;
     const point = pointerPoint(event);
     selectionRect = { x: Math.min(cropStart.x, point.x), y: Math.min(cropStart.y, point.y),
       width: Math.max(1, Math.abs(point.x - cropStart.x)), height: Math.max(1, Math.abs(point.y - cropStart.y)) };
-    drawSource();
+    drawOriginal();
   });
   canvas.addEventListener('pointerup', () => {
     if (!cropMode || !selectionRect) return;
     if (selectionRect.width < 2 || selectionRect.height < 2) selectionRect = null;
     applyCropButton.disabled = !selectionRect;
-    if (selectionRect) setStatus('Crop area selected: ' + Math.round(selectionRect.width) + ' × ' + Math.round(selectionRect.height) + ' px');
     cropStart = null;
-    drawSource();
+    drawOriginal();
+    schedulePreview();
+    if (selectionRect) setStatus('Crop selection previewed below: ' + Math.round(selectionRect.width) + ' × ' + Math.round(selectionRect.height) + ' px');
   });
   canvas.addEventListener('pointercancel', () => { cropStart = null; });
+
   copyButton.addEventListener('click', async () => {
     if (!outputBlob) return;
     try {
       if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Image clipboard writing is not supported in this browser. Use Download image instead.');
       let clipboardBlob = outputBlob;
       if (typeof ClipboardItem.supports === 'function' && !ClipboardItem.supports(outputBlob.type)) {
-        clipboardBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        clipboardBlob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/png'));
       }
       if (!clipboardBlob) throw new Error('This browser could not prepare a clipboard-compatible image. Use Download image instead.');
       await navigator.clipboard.write([new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })]);
-      setStatus('Image copied to clipboard.');
+      setStatus('Processed output image copied to clipboard.');
     } catch (error) { setStatus(error.message || 'Could not copy image to clipboard.'); }
   });
   downloadButton.addEventListener('click', () => {
@@ -300,22 +322,23 @@ export function initImageTools() {
     link.download = (sourceFile?.name.replace(/\.[^.]+$/, '') || 'quiet-reader-image') + '-edited.' + extension;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setStatus('Edited image downloaded.');
+    setStatus('Processed output image downloaded.');
   });
   $('imageToolReset').addEventListener('click', () => {
     if (!sourceImage) return;
-    cropRect = null; selectionRect = null; cropMode = false;
+    cropRect = null; selectionRect = null; cropMode = false; cropStart = null;
     aspectRatio = sourceImage.naturalWidth / sourceImage.naturalHeight;
     resizeWidth.value = sourceImage.naturalWidth; resizeHeight.value = sourceImage.naturalHeight;
     quality.value = '85'; qualityValue.textContent = '85%'; format.value = 'webp'; textInput.value = '';
     document.querySelectorAll('[data-image-quality]').forEach(button => button.classList.toggle('active', button.dataset.imageQuality === '85'));
-    textSize.value = '36'; textColor.value = '#ffffff'; textPosition.value = 'bottom';
+    textSize.value = '36'; textColor.value = '#ffffff'; textPosition.value = 'center-center';
     keepRatio.checked = true;
+    applyCropButton.disabled = true; cancelCropButton.disabled = true;
     schedulePreview();
-    cropHint.textContent = 'Choose Crop, then drag across the image to select the area to keep.';
+    cropHint.textContent = 'Choose Crop, then drag over the original image to select the area to keep.';
   });
   screen.addEventListener('paste', async event => {
     const file = [...(event.clipboardData?.items || [])].find(item => item.type.startsWith('image/'))?.getAsFile();
-    if (file) { event.preventDefault(); await loadFile(file); }
+    if (file) { event.preventDefault(); await previewClipboardFile(file); }
   });
 }
