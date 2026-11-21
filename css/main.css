@@ -1797,3 +1797,11 @@ button.primary:hover:not(:disabled),.primary-button:hover:not(:disabled),.action
 .gallery-delete-confirm p{margin:0;line-height:1.5}
 #modalHost:has(.gallery-delete-confirm) .modal{width:min(430px,100%)}
 @media(max-width:520px){.image-tool-metadata-grid{grid-template-columns:1fr}.image-tool-metadata-description{grid-column:auto}}
+
+.gallery-delete-overlay{position:absolute;inset:0;z-index:30;display:grid;place-items:center;padding:18px;background:rgba(0,0,0,.66);backdrop-filter:blur(5px);border-radius:inherit}
+.gallery-delete-confirm{width:min(420px,100%);display:grid;gap:12px;padding:20px;border:1px solid var(--line);border-radius:13px;background:var(--panel);box-shadow:0 18px 60px rgba(0,0,0,.38)}
+.gallery-delete-confirm h3,.gallery-delete-confirm p{margin:0}
+.gallery-delete-confirm h3{font-size:17px}
+.gallery-delete-confirm p{line-height:1.5}
+.gallery-image-metadata{display:grid;gap:5px;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);font-size:11px}
+.gallery-image-metadata p{margin:0;overflow-wrap:anywhere}
