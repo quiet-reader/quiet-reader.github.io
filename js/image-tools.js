@@ -36,6 +36,7 @@ export function initImageTools() {
   let cropMode = false;
   let cropStart = null;
   let cropRect = null;
+  let selectionRect = null;
   let previewTimer = 0;
   let renderGeneration = 0;
   let aspectRatio = 1;
@@ -85,11 +86,12 @@ export function initImageTools() {
     if (cropMode && cropRect) drawCropOverlay();
   };
   const drawCropOverlay = () => {
-    if (!cropRect || !sourceImage) return;
+    const selection = selectionRect || cropRect;
+    if (!selection || !sourceImage) return;
     const { width, height, base } = outputDimensions();
     const scaleX = width / base.width, scaleY = height / base.height;
-    const x = (cropRect.x - base.x) * scaleX, y = (cropRect.y - base.y) * scaleY;
-    const w = cropRect.width * scaleX, h = cropRect.height * scaleY;
+    const x = (selection.x - base.x) * scaleX, y = (selection.y - base.y) * scaleY;
+    const w = selection.width * scaleX, h = selection.height * scaleY;
     context.save();
     context.fillStyle = 'rgba(0,0,0,.48)';
     context.fillRect(0, 0, width, y);
@@ -199,6 +201,7 @@ export function initImageTools() {
     if (!sourceImage) return;
     cropMode = true;
     cropStart = null;
+    selectionRect = null;
     applyCropButton.disabled = true;
     cancelCropButton.disabled = false;
     cropHint.textContent = 'Drag on the image to select the crop area, then choose Apply crop.';
@@ -206,16 +209,18 @@ export function initImageTools() {
     setStatus('Crop selection mode');
   });
   cancelCropButton.addEventListener('click', () => {
-    cropMode = false; cropStart = null; cropRect = null;
+    cropMode = false; cropStart = null; selectionRect = null;
     applyCropButton.disabled = true; cancelCropButton.disabled = true;
     schedulePreview();
     cropHint.textContent = 'Choose Crop, then drag across the image to select the area to keep.';
   });
   applyCropButton.addEventListener('click', () => {
-    if (!cropRect) return;
+    if (!selectionRect) return;
+    cropRect = selectionRect;
+    selectionRect = null;
     cropMode = false;
-    resizeWidth.value = cropRect.width;
-    resizeHeight.value = cropRect.height;
+    resizeWidth.value = Math.round(cropRect.width);
+    resizeHeight.value = Math.round(cropRect.height);
     aspectRatio = cropRect.width / cropRect.height;
     applyCropButton.disabled = true; cancelCropButton.disabled = true;
     schedulePreview();
@@ -223,29 +228,30 @@ export function initImageTools() {
   });
   const pointerPoint = event => {
     const rect = canvas.getBoundingClientRect();
-    return { x: Math.max(0, Math.min(sourceImage.naturalWidth, (event.clientX - rect.left) * sourceImage.naturalWidth / rect.width)),
-      y: Math.max(0, Math.min(sourceImage.naturalHeight, (event.clientY - rect.top) * sourceImage.naturalHeight / rect.height)) };
+    const base = cropRect || { x: 0, y: 0, width: sourceImage.naturalWidth, height: sourceImage.naturalHeight };
+    return { x: base.x + Math.max(0, Math.min(base.width, (event.clientX - rect.left) * base.width / rect.width)),
+      y: base.y + Math.max(0, Math.min(base.height, (event.clientY - rect.top) * base.height / rect.height)) };
   };
   canvas.addEventListener('pointerdown', event => {
     if (!cropMode || !sourceImage) return;
     event.preventDefault();
     cropStart = pointerPoint(event);
-    cropRect = { x: cropStart.x, y: cropStart.y, width: 1, height: 1 };
+    selectionRect = { x: cropStart.x, y: cropStart.y, width: 1, height: 1 };
     canvas.setPointerCapture(event.pointerId);
     drawSource();
   });
   canvas.addEventListener('pointermove', event => {
     if (!cropMode || !cropStart || !sourceImage) return;
     const point = pointerPoint(event);
-    cropRect = { x: Math.min(cropStart.x, point.x), y: Math.min(cropStart.y, point.y),
+    selectionRect = { x: Math.min(cropStart.x, point.x), y: Math.min(cropStart.y, point.y),
       width: Math.max(1, Math.abs(point.x - cropStart.x)), height: Math.max(1, Math.abs(point.y - cropStart.y)) };
     drawSource();
   });
   canvas.addEventListener('pointerup', () => {
-    if (!cropMode || !cropRect) return;
-    if (cropRect.width < 2 || cropRect.height < 2) cropRect = null;
-    applyCropButton.disabled = !cropRect;
-    if (cropRect) setStatus('Crop area selected: ' + Math.round(cropRect.width) + ' × ' + Math.round(cropRect.height) + ' px');
+    if (!cropMode || !selectionRect) return;
+    if (selectionRect.width < 2 || selectionRect.height < 2) selectionRect = null;
+    applyCropButton.disabled = !selectionRect;
+    if (selectionRect) setStatus('Crop area selected: ' + Math.round(selectionRect.width) + ' × ' + Math.round(selectionRect.height) + ' px');
     drawSource();
   });
   copyButton.addEventListener('click', async () => {
@@ -269,7 +275,7 @@ export function initImageTools() {
   });
   $('imageToolReset').addEventListener('click', () => {
     if (!sourceImage) return;
-    cropRect = null; cropMode = false;
+    cropRect = null; selectionRect = null; cropMode = false;
     resizeWidth.value = sourceImage.naturalWidth; resizeHeight.value = sourceImage.naturalHeight;
     quality.value = '85'; format.value = 'webp'; textInput.value = '';
     textSize.value = '36'; textColor.value = '#ffffff'; textPosition.value = 'bottom';
